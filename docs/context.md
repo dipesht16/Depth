@@ -41,6 +41,7 @@
 
 ## Technical Baseline
 - **Flutter Project Directory**: `d:\Flutter\Wallpaper`
+- **Git Repository**: https://github.com/dipesht16/Depth.git
 - **Android Platform Constraints**:
   - Min SDK Version: API 26 (Android 8.0) *— to be configured in Module 1*
   - Orientation: Portrait Only *— to be configured in Module 1*
