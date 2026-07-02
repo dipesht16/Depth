@@ -14,8 +14,8 @@
 ---
 
 ## Current Status
-- **Phase**: Typography, Effects & Transform Customization
-- **Active Module**: None (Module 7 Completed, ready for Module 8)
+- **Phase**: Native Wallpaper Service Integration
+- **Active Module**: None (Module 8 Completed, ready for Module 9)
 
 ---
 
@@ -73,6 +73,15 @@
   - [x] Implemented full Matrix4 transforms supporting rotation, stretch scaling, and 4-way skews (horizontal, vertical, bottom, left).
   - [x] Developed Effects and Transform tab panels with individual reset controls and haptic feedback.
   - [x] Removed atmospheric depth background blur per user request.
+
+- [x] **Module 8**: Kotlin WallpaperService (Static)
+  - [x] Registered live wallpaper permissions and BIND_WALLPAPER service in AndroidManifest.xml.
+  - [x] Configured XML metadata descriptor and generated picker thumbnail.
+  - [x] Setup com.yourcompany.depthwallpaper/wallpaper MethodChannel bridge in MainActivity.kt.
+  - [x] Programmed SharedPreferences saving and ACTION_CHANGE_LIVE_WALLPAPER intents.
+  - [x] Built WallpaperConfig parser and OOM-safe downsampling BitmapLoader.
+  - [x] Developed native Kotlin DepthWallpaperService canvas rendering pipeline.
+  - [x] Added Apply checkmark action in Flutter StudioScreen.
 
 ---
 
@@ -180,6 +189,17 @@
   - **Correction**: Removed Atmospheric Depth background blur from UI/preview per user request, and resolved deprecation of `scale` in Matrix4 and `activeColor` in SwitchListTile.
 - **Verification Results**:
   - Static Analysis (`flutter analyze`): **No issues found**.
+  - Widget Testing (`flutter test`): **All tests passed**.
+
+### Module 8 Walkthrough: Kotlin WallpaperService (Static)
+- **Changes Implemented**:
+  - **Manifest & Resources**: Added `SET_WALLPAPER` permissions, declared `.DepthWallpaperService` BIND_WALLPAPER in [AndroidManifest.xml](file:///d:/Flutter/Wallpaper/android/app/src/main/AndroidManifest.xml), created [wallpaper.xml](file:///d:/Flutter/Wallpaper/android/app/src/main/res/xml/wallpaper.xml) description, and copied generated `wallpaper_thumbnail.png` into `drawable`.
+  - **MainActivity Native Bridge**: Programmed `MethodChannel` handler in [MainActivity.kt](file:///d:/Flutter/Wallpaper/android/app/src/main/kotlin/com/yourcompany/depthwallpaper/MainActivity.kt) supporting robust `Number` parsing of Dart config maps into shared preferences and launching the wallpaper picker chooser.
+  - **OOM-Safe Bitmap Loading**: Built [BitmapLoader.kt](file:///d:/Flutter/Wallpaper/android/app/src/main/kotlin/com/yourcompany/depthwallpaper/BitmapLoader.kt) utilizing `inSampleSize` calculations to load optimized downsampled bitmaps.
+  - **Native Rendering Service**: Built [DepthWallpaperService.kt](file:///d:/Flutter/Wallpaper/android/app/src/main/kotlin/com/yourcompany/depthwallpaper/DepthWallpaperService.kt) to manage canvas drawing (Background -> Vector Clock with rotation/stretch/skews/shadows -> Foreground overlay) and SharedPreferences change listening.
+  - **Apply Button**: Added checkmark action button and channel calls in [studio_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/studio_screen.dart).
+- **Verification Results**:
+  - Static Analysis (`flutter analyze`): **No issues found** (resolved color value deprecation).
   - Widget Testing (`flutter test`): **All tests passed**.
 
 

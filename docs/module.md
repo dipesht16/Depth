@@ -1542,7 +1542,2105 @@ Skew from left side
 Similar to Bottom Skew:
 
 Saved in config
-Simpli
-<truncated 69322 bytes>
-
-NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.
+Simplified in Flutter preview
+Full implementation in Kotlin
+Config Property:
+Add: config.leftSkew (double)
+7.14 Matrix Transformation Implementation
+Combining Transformations:
+In WallpaperPreview, update clock rendering:
+text
+Transform widget wrapping clock Text:
+- transform: Matrix4.identity()
+  ..rotateZ(rotation in radians)
+  ..scale(1.0, stretch)
+  ..setEntry(0, 1, horizontalSkew)
+  ..setEntry(1, 0, verticalSkew)
+  ...(additional skew transformations)
+- alignment: Alignment.center
+- child: Opacity(
+  opacity: textOpacity,
+  child: Text(...)
+  )
+Order Matters:
+Rotation first
+Then scale (stretch)
+Then skew transformations
+Order affects visual result
+7.15 Effects Config Properties
+Add to WallpaperConfig:
+text
+Effects properties:
+- textOpacity: double (default 1.0)
+- atmosphericDepthEnabled: bool (default false)
+- edgeStrokeEnabled: bool (default false)
+- shadowEnabled: bool (default true)
+- strokeEnabled: bool (default false)
+Transform properties:
+- rotation: double (default 0.0)
+- stretch: double (default 1.0)
+- horizontalSkew: double (default 0.0)
+- verticalSkew: double (default 0.0)
+- bottomSkewH: double (default 0.0)
+- leftSkew: double (default 0.0)
+7.16 Preview Updates for Effects
+Shadow Implementation:
+text
+TextStyle shadows property:
+- If shadowEnabled: [Shadow(...)]
+- If not: null or []
+Stroke Implementation:
+text
+Stack approach:
+1. Text with stroke (foreground Paint)
+2. Text with fill (normal color)
+Both layered if edgeStrokeEnabled
+Opacity Implementation:
+text
+Opacity widget wrapping entire Text
+7.17 Switch Styling
+SwitchListTile Design:
+Active color: Yellow (#FFD700)
+Inactive color: Gray (#757575)
+Title text: White, 16sp
+Subtitle text: Gray, 14sp
+Switch on right side
+Tap anywhere on tile to toggle
+7.18 Complex Transform Handling
+Edge Cases:
+Extreme rotation (±180°): text upside down (allowed)
+Extreme stretch (0.5 or 2.0): heavily distorted (allowed)
+Multiple skews combined: complex distortion (allowed)
+User experimentation encouraged
+Performance:
+Matrix transformations cheap (GPU accelerated)
+No performance impact from complex transforms
+Smooth slider interaction maintained
+Expected Outcomes:
+Effects tab with 5 controls functional
+Transform tab with 6 sliders functional
+All effects visible in preview
+Transformations render correctly
+Smooth real-time updates
+No performance degradation
+Combined effects work together
+Testing Criteria:
+Effects Tab:
+Opacity slider: 0% = invisible, 100% = opaque
+Atmospheric depth toggle: visual blur (if implemented in preview)
+Edge stroke toggle: outline appears around text
+Shadow toggle: shadow appears/disappears
+Stroke toggle: different outline effect
+Transform Tab:
+Rotation: -90° = rotated left, +90° = rotated right
+Stretch: 0.5 = squashed, 2.0 = tall
+Horizontal skew: -1.0 = left slant, +1.0 = right slant
+Vertical skew: creates tilt effect
+Combined transforms: rotation + stretch + skew = complex effect
+Integration:
+Effects + Transform together work correctly
+Typography + Effects + Transform all apply simultaneously
+No conflicts between different settings
+Preview accurately represents all settings
+User Experience Flow:
+text
+User switches to Effects tab
+  → Adjusts opacity to 70% → clock semi-transparent
+  → Enables shadow → drop shadow appears
+  → Enables edge stroke → outline appears
+User switches to Transform tab
+  → Rotates 15° → slight angle
+  → Stretches to 1.5 → taller text
+  → Adds horizontal skew 0.3 → italic-like slant
+  → Preview shows rotated, stretched, skewed, semi-transparent clock
+  → User satisfied with creative styling
+Key Files to Create:
+widgets/effects_tab.dart - Effects tab implementation
+widgets/transform_tab.dart - Transform tab implementation
+Updated models/wallpaper_config.dart - Add 11 new properties
+Updated widgets/wallpaper_preview.dart - Apply effects and transforms to clock
+No New Dependencies
+Uses existing Flutter Transform, Opacity, Matrix4 widgets
+Critical Notes for AI Agent:
+Matrix4 transformations are cumulative (order matters)
+Some skew effects simplified in Flutter preview (full in Kotlin)
+Rotation uses radians, display shows degrees
+Stroke and edge stroke are different effects (can combine)
+Atmospheric depth may be simplified in preview (full effect in Kotlin)
+Transform alignment must be center for expected rotation behavior
+Extreme values allowed (user experimentation feature, not bug)
+All sliders use same visual style as Module 5
+  MODULE 8: Kotlin WallpaperService (Static)
+Objective:
+Create native Android WallpaperService in Kotlin that renders the depth wallpaper using saved 
+configuration, displaying all layers (background, clock, foreground) on the home screen with static time 
+display.
+Detailed Requirements:
+8.1 WallpaperService Fundamentals
+Core Concept:
+WallpaperService is NOT an Activity
+Runs as background service
+Renders directly to SurfaceHolder (canvas)
+Persists when Flutter app closes
+Managed by Android's WallpaperManager system
+Service Lifecycle:
+text
+System requests wallpaper
+  → onCreateEngine() called
+  → Creates Engine instance
+  → Engine.onCreate()
+  → Engine.onSurfaceCreated()
+  → Engine.onSurfaceChanged()
+  → Draw wallpaper to canvas
+  → Wait for visibility/offset changes
+  → Update as needed
+  → Eventually: onDestroy() cleanup
+8.2 Kotlin Project Structure
+Create these files in android/app/src/main/kotlin/.../:
+text
+package_name/
+├── DepthWallpaperService.kt (main service)
+├── WallpaperConfig.kt (data class)
+└── BitmapLoader.kt (helper class)
+8.3 WallpaperConfig Data Class
+Purpose:
+Mirror Flutter's WallpaperConfig, store all customization settings
+Properties Needed:
+Kotlin
+data class WallpaperConfig(
+ // Basics
+ val fontSize: Float,
+ val horizontalPos: Float,
+ val verticalPos: Float,
+ // Typography
+ val clockFormat: String,
+ val fontColor: Int,
+ val fontFamily: String,
+ val letterSpacing: Float,
+ val secondaryColor: Int?,
+ // Effects
+ val textOpacity: Float,
+ val shadowEnabled: Boolean,
+ val strokeEnabled: Boolean,
+ val edgeStrokeEnabled: Boolean,
+ val atmosphericDepthEnabled: Boolean,
+ // Transform
+ val rotation: Float,
+ val stretch: Float,
+ val horizontalSkew: Float,
+ val verticalSkew: Float,
+ // File paths
+ val backgroundPath: String?,
+ val foregroundPath: String?
+)
+Factory Method:
+Kotlin
+companion object {
+ fun fromSharedPreferences(prefs: SharedPreferences): WallpaperConfig {
+ return WallpaperConfig(
+ fontSize = prefs.getFloat("fontSize", 0.24f),
+ horizontalPos = prefs.getFloat("horizontalPos", 0.48f),
+ // ... load all properties with defaults
+ )
+ }
+}
+8.4 SharedPreferences Storage
+Storage Location:
+Name: "wallpaper_config"
+Mode: MODE_PRIVATE
+Stored in: /data/data/package_name/shared_prefs/
+Data Persistence:
+Flutter saves config via MethodChannel (see 8.5)
+Kotlin reads from SharedPreferences
+Survives app restarts
+Independent of Flutter app lifecycle
+8.5 MethodChannel Integration
+MainActivity.kt Setup:
+Create MethodChannel handler:
+Channel Name:
+Kotlin
+private val CHANNEL = "com.yourapp/wallpaper"
+Methods to Handle:
+Method 1: saveConfig
+Purpose: Receive config from Flutter, save to SharedPreferences
+Arguments: Map<String, Any> containing all config properties
+Action: Convert map to SharedPreferences entries
+Return: Boolean success
+Method 2: setWallpaper
+Purpose: Launch system wallpaper picker
+Arguments: None
+Action: Create Intent for ACTION_CHANGE_LIVE_WALLPAPER
+ComponentName: DepthWallpaperService class
+Return: Boolean success
+Implementation Pattern:
+Kotlin
+MethodChannel(...).setMethodCallHandler { call, result ->
+ when (call.method) {
+ "saveConfig" -> {
+ val configMap = call.arguments as Map<String, Any>
+ saveConfigToPrefs(configMap)
+ result.success(true)
+ }
+ "setWallpaper" -> {
+ launchWallpaperPicker()
+ result.success(true)
+ }
+ else -> result.notImplemented()
+ }
+}
+Config Saving Logic:
+Kotlin
+private fun saveConfigToPrefs(config: Map<String, Any>) {
+ val prefs = getSharedPreferences("wallpaper_config", MODE_PRIVATE)
+ prefs.edit().apply {
+ putFloat("fontSize", (config["fontSize"] as Double).toFloat())
+ putFloat("horizontalPos", (config["horizontalPos"] as Double).toFloat())
+ putInt("fontColor", config["fontColor"] as Int)
+ putString("clockFormat", config["clockFormat"] as String)
+ putString("backgroundPath", config["backgroundPath"] as String?)
+ // ... save all properties
+ apply() // or commit()
+ }
+}
+Type Conversion Notes:
+Dart double → Kotlin Float: cast to Double first, then toFloat()
+Dart int → Kotlin Int: direct cast
+Dart String → Kotlin String: direct cast
+Dart Color.value → Kotlin Int (ARGB color)
+8.6 DepthWallpaperService Structure
+Service Declaration:
+Kotlin
+class DepthWallpaperService : WallpaperService() {
+ override fun onCreateEngine(): Engine {
+ return DepthWallpaperEngine()
+ }
+ inner class DepthWallpaperEngine : Engine() {
+ // ... implementation
+ }
+}
+Engine Class Variables:
+Kotlin
+inner class DepthWallpaperEngine : Engine() {
+ private var backgroundBitmap: Bitmap? = null
+ private var foregroundBitmap: Bitmap? = null
+ private lateinit var config: WallpaperConfig
+ private lateinit var clockPaint: Paint
+ private lateinit var strokePaint: Paint
+ private var canvasWidth: Int = 0
+ private var canvasHeight: Int = 0
+}
+8.7 Engine Lifecycle Implementation
+onCreate():
+text
+Purpose: Initialize resources
+Steps:
+1. Call super.onCreate()
+2. Load config from SharedPreferences
+3. Load bitmap images
+4. Setup Paint objects
+5. Ready for rendering
+onSurfaceCreated():
+text
+Purpose: Surface ready for drawing
+Action: Store surfaceHolder reference
+onSurfaceChanged():
+text
+Purpose: Surface dimensions changed
+Arguments: format, width, height
+Steps:
+1. Store canvas dimensions
+2. Scale bitmaps if needed
+3. Recalculate text size based on width
+4. Trigger drawWallpaper()
+onSurfaceRedrawNeeded():
+text
+Purpose: System requests redraw
+Action: Call drawWallpaper()
+onDestroy():
+text
+Purpose: Cleanup resources
+Steps:
+1. Recycle backgroundBitmap
+2. Recycle foregroundBitmap
+3. Call super.onDestroy()
+8.8 Bitmap Loading
+BitmapLoader Helper Class:
+Purpose: Load and optimize images for wallpaper rendering
+Method: loadOptimizedBitmap()
+Kotlin
+Parameters:
+- path: String (file path)
+- targetWidth: Int (screen width)
+- targetHeight: Int (screen height)
+Returns: Bitmap
+Logic:
+1. Use BitmapFactory.Options
+2. Set inJustDecodeBounds = true (get dimensions without loading)
+3. Decode file to get width/height
+4. Calculate inSampleSize (downsample if too large)
+5. Set inJustDecodeBounds = false
+6. Set inPreferredConfig = ARGB_8888
+7. Decode file with options
+8. Scale to exact target size (if needed)
+9. Return optimized bitmap
+Sample Size Calculation:
+Kotlin
+Purpose: Reduce memory usage for large images
+Logic:
+- If image width > target width × 2: inSampleSize = 2
+- If image width > target width × 4: inSampleSize = 4
+- Powers of 2 for efficiency (2, 4, 8, 16)
+- Example: 4000px image for 1080px screen → sample size 4 → loads as 1000px
+Memory Considerations:
+Full HD image (1920×1080 ARGB_8888): ~8MB memory
+Downsample aggressively (wallpaper doesn't need full resolution)
+Target: max 2048px on longest side
+Recycle bitmaps when done (prevent memory leaks)
+8.9 Paint Setup
+Clock Text Paint:
+Kotlin
+clockPaint = Paint().apply {
+ color = config.fontColor
+ textSize = config.fontSize * canvasWidth
+ isAntiAlias = true
+ typeface = getTypefaceForFont(config.fontFamily)
+ letterSpacing = config.letterSpacing / 100f // Android uses em units
+ alpha = (config.textOpacity * 255).toInt()
+ if (config.shadowEnabled) {
+ setShadowLayer(8f, 0f, 4f, Color.BLACK)
+ }
+}
+Stroke Paint (if enabled):
+Kotlin
+strokePaint = Paint().apply {
+ color = Color.WHITE
+ textSize = config.fontSize * canvasWidth
+ isAntiAlias = true
+ style = Paint.Style.STROKE
+ strokeWidth = if (config.edgeStrokeEnabled) 2f else 4f
+ typeface = clockPaint.typeface
+ letterSpacing = clockPaint.letterSpacing
+}
+Typeface Loading:
+Kotlin
+private fun getTypefaceForFont(fontFamily: String): Typeface {
+ return when (fontFamily) {
+ "Roboto" -> Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+ "Montserrat" -> ResourcesCompat.getFont(this, R.font.montserrat_bold)
+ "Oswald" -> ResourcesCompat.getFont(this, R.font.oswald_bold)
+ // ... load from assets/fonts/
+ else -> Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+ }
+}
+Font Asset Integration:
+Copy .ttf files from Flutter assets to Android res/font/
+Access via R.font.font_name
+Or use assets folder path
+8.10 Drawing Pipeline
+Main drawWallpaper() Method:
+Kotlin
+private fun drawWallpaper() {
+ val canvas = surfaceHolder.lockCanvas() ?: return
+ try {
+ // Layer 1: Background
+ drawBackground(canvas)
+ // Layer 2: Clock
+ drawClock(canvas)
+ // Layer 3: Foreground
+ drawForeground(canvas)
+ } finally {
+ surfaceHolder.unlockCanvasAndPost(canvas)
+ }
+}
+Layer 1: Background Drawing:
+Kotlin
+private fun drawBackground(canvas: Canvas) {
+ backgroundBitmap?.let { bitmap ->
+ val destRect = Rect(0, 0, canvas.width, canvas.height)
+ if (config.atmosphericDepthEnabled) {
+ // Apply blur effect
+ val blurPaint = Paint().apply {
+ maskFilter = BlurMaskFilter(15f, BlurMaskFilter.Blur.NORMAL)
+ }
+ canvas.drawBitmap(bitmap, null, destRect, blurPaint)
+ } else {
+ canvas.drawBitmap(bitmap, null, destRect, null)
+ }
+ }
+}
+Layer 2: Clock Drawing:
+Kotlin
+private fun drawClock(canvas: Canvas) {
+ val time = getCurrentTime()
+ // Calculate position
+ val x = config.horizontalPos * canvas.width
+ val y = config.verticalPos * canvas.height
+ // Save canvas state for transformations
+ canvas.save()
+ // Apply transformations
+ applyTransformations(canvas, x, y)
+ // Draw stroke first (if enabled)
+ if (config.edgeStrokeEnabled || config.strokeEnabled) {
+ canvas.drawText(time, x, y, strokePaint)
+ }
+ // Draw main text
+ canvas.drawText(time, x, y, clockPaint)
+ // Restore canvas
+ canvas.restore()
+}
+Transformation Application:
+Kotlin
+private fun applyTransformations(canvas: Canvas, pivotX: Float, pivotY: Float) {
+ // Rotation
+ if (config.rotation != 0f) {
+ canvas.rotate(config.rotation, pivotX, pivotY)
+ }
+ // Stretch (scale Y axis)
+ if (config.stretch != 1f) {
+ canvas.scale(1f, config.stretch, pivotX, pivotY)
+ }
+ // Skew
+ if (config.horizontalSkew != 0f || config.verticalSkew != 0f) {
+ val matrix = Matrix()
+ matrix.setSkew(config.horizontalSkew, config.verticalSkew, pivotX, pivotY)
+ canvas.concat(matrix)
+ }
+}
+Layer 3: Foreground Drawing:
+Kotlin
+private fun drawForeground(canvas: Canvas) {
+ foregroundBitmap?.let { bitmap ->
+ val destRect = Rect(0, 0, canvas.width, canvas.height)
+ canvas.drawBitmap(bitmap, null, destRect, null)
+ }
+}
+8.11 Time Formatting
+getCurrentTime() Method:
+Kotlin
+private fun getCurrentTime(): String {
+ val sdf = when (config.clockFormat) {
+ "HH:MM:SS" -> SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+ "HH.MM" -> SimpleDateFormat("HH.mm", Locale.getDefault())
+ "HH/MM" -> SimpleDateFormat("HH/mm", Locale.getDefault())
+ else -> SimpleDateFormat("HH:mm", Locale.getDefault())
+ }
+ return sdf.format(Date())
+}
+Note: Time is static in this module (doesn't update). Module 9 adds live updates.
+8.12 Android Manifest Configuration
+Declare Service:
+XML
+<service
+ android:name=".DepthWallpaperService"
+ android:permission="android.permission.BIND_WALLPAPER"
+ android:exported="true">
+ <intent-filter>
+ <action android:name="android.service.wallpaper.WallpaperService" />
+ </intent-filter>
+ <meta-data
+ android:name="android.service.wallpaper"
+ android:resource="@xml/wallpaper" />
+</service>
+Add Permission:
+XML
+<uses-permission android:name="android.permission.SET_WALLPAPER" />
+<uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
+8.13 Wallpaper Metadata
+Create res/xml/wallpaper.xml:
+XML
+<?xml version="1.0" encoding="utf-8"?>
+<wallpaper
+ xmlns:android="http://schemas.android.com/apk/res/android"
+ android:description="@string/wallpaper_description"
+ android:thumbnail="@drawable/wallpaper_thumbnail"
+ android:author="@string/app_name" />
+Add String Resource:
+XML
+<!-- res/values/strings.xml -->
+<string name="wallpaper_description">Depth effect wallpaper with customizable clock</string>
+Thumbnail Image:
+Create preview image (512×512px)
+Place in res/drawable/wallpaper_thumbnail.png
+Shows in system wallpaper picker
+8.14 Flutter Integration
+Studio Screen - Apply Button:
+Add button to Studio AppBar:
+dart
+IconButton(
+ icon: Icon(Icons.check),
+ onPressed: _applyWallpaper,
+)
+Apply Method:
+dart
+Future<void> _applyWallpaper() async {
+ try {
+ // Save config to SharedPreferences
+ await platform.invokeMethod('saveConfig', {
+ 'fontSize': wallpaperConfig.fontSize,
+ 'horizontalPos': wallpaperConfig.horizontalPos,
+ 'verticalPos': wallpaperConfig.verticalPos,
+ 'fontColor': wallpaperConfig.fontColor.value,
+ 'clockFormat': wallpaperConfig.clockFormat,
+ 'letterSpacing': wallpaperConfig.letterSpacing,
+ 'textOpacity': wallpaperConfig.textOpacity,
+ 'shadowEnabled': wallpaperConfig.shadowEnabled,
+ 'rotation': wallpaperConfig.rotation,
+ 'stretch': wallpaperConfig.stretch,
+ 'backgroundPath': wallpaperData.backgroundImagePath,
+ 'foregroundPath': wallpaperData.foregroundImagePath,
+ // ... all config properties
+ });
+ // Launch wallpaper picker
+ await platform.invokeMethod('setWallpaper');
+ // Show success message
+ ScaffoldMessenger.of(context).showSnackBar(
+ SnackBar(content: Text('Wallpaper configuration saved! Select "Depth Wallpaper" in picker.')),
+ );
+ } catch (e) {
+ // Show error
+ ScaffoldMessenger.of(context).showSnackBar(
+ SnackBar(content: Text('Error: ${e.toString()}')),
+ );
+ }
+}
+8.15 Testing Procedure
+Development Testing:
+Configure wallpaper in Flutter app
+Tap apply button
+System wallpaper picker opens
+Select "Depth Wallpaper" from list
+Preview shows configured wallpaper
+Tap "Set wallpaper"
+Return to home screen
+Verify: wallpaper displays correctly
+Verification Checklist:
+ Background image fills screen
+ Clock appears at correct position
+ Clock size matches configuration
+ Foreground subject overlays clock
+ Depth effect visible (subject in front of clock)
+ Clock color correct
+ Font family applied
+ Rotation/stretch/skew applied
+ Shadow/stroke visible if enabled
+ No crashes or artifacts
+8.16 Error Handling
+Scenarios to Handle:
+Missing Image Files:
+If backgroundPath null or file not found: show solid color background
+If foregroundPath null: show only background + clock (no depth effect)
+Corrupted Config:
+If SharedPreferences missing/corrupted: use default config
+Never crash - always fallback to safe defaults
+Out of Memory:
+Catch OOM in bitmap loading
+Log error, use null bitmap (skip that layer)
+App continues functioning
+Invalid Color Values:
+Validate color integers (ARGB range)
+Fallback to white if invalid
+8.17 Performance Optimization
+Drawing Efficiency:
+Only redraw when necessary (not every frame)
+Cache Paint objects (don't recreate each draw)
+Use hardware acceleration (enabled by default)
+Minimize canvas operations
+Memory Management:
+Downsample large images aggressively
+Recycle bitmaps in onDestroy()
+Don't hold references to Activity/Context
+Use WeakReference if needed
+Battery Impact:
+Static wallpaper = minimal battery use
+No animations in this module
+Drawing happens on visibility changes only
+Expected Outcomes:
+Live wallpaper service functional
+Appears in system wallpaper picker
+Renders all three layers correctly
+Configuration from Flutter applied accurately
+Smooth performance (no lag)
+No memory leaks or crashes
+Works on different screen sizes/densities
+Persists after app closes
+Testing Criteria:
+Configure complex wallpaper (all features used)
+Apply wallpaper → see in picker
+Set as wallpaper → renders correctly on home screen
+Lock/unlock device → wallpaper persists
+Restart device → wallpaper still there
+Change to different wallpaper → service stops cleanly
+Return to depth wallpaper → loads config correctly
+Test on different devices (resolutions, Android versions)
+User Experience Flow:
+text
+User completes customization in Studio
+ → Taps checkmark (apply) button
+ → Config saved message appears
+ → System wallpaper picker opens
+ → "Depth Wallpaper" appears in list with thumbnail
+ → User taps it
+ → Preview shows full configured wallpaper
+ → User taps "Set wallpaper"
+ → Returns to home screen
+ → Wallpaper displays with depth effect
+ → Subject appears in front of clock
+ → User satisfied, closes Flutter app
+ → Wallpaper persists independently
+Key Files to Create:
+android/.../DepthWallpaperService.kt - Main service
+android/.../WallpaperConfig.kt - Config data class
+android/.../BitmapLoader.kt - Image optimization helper
+android/.../MainActivity.kt - Add MethodChannel handler
+android/app/src/main/res/xml/wallpaper.xml - Service metadata
+Updated android/app/src/main/AndroidManifest.xml - Service declaration
+No New Dependencies
+Uses existing MethodChannel
+Critical Notes for AI Agent:
+WallpaperService runs in separate process from Flutter
+Cannot use Flutter UI widgets in WallpaperService
+All rendering is native Android Canvas
+Config must persist across app restarts (SharedPreferences)
+Image paths must be accessible from WallpaperService context
+Time shown is current time but doesn't update yet (static render)
+Thorough testing on real device essential (emulator limitations)
+Different Android versions may have subtle rendering differences
+Always provide fallback for missing resources
+Performance critical: test on low-end devices (2GB RAM)
+ MODULE 9: Live Time Updates
+Objective:
+Implement automatic time updates in the WallpaperService so the clock displays real-time and updates every
+minute, with proper lifecycle management to conserve battery.
+Detailed Requirements:
+9.1 Update Mechanism Design
+Purpose:
+Clock should refresh every minute to show current time without user intervention
+Core Approach:
+Use Android Handler + Runnable pattern
+Post delayed update every 60 seconds (60000 milliseconds)
+Only run updates when wallpaper visible
+Stop updates when invisible (screen off, different wallpaper, etc.)
+Why Not Animation Loop:
+Animation loop runs every frame (60fps) - wasteful
+Clock only needs update every minute
+Handler.postDelayed is battery-efficient
+System wakes up once per minute, not continuously
+9.2 Handler Implementation
+Add to DepthWallpaperEngine:
+Class Variables:
+Kotlin
+inner class DepthWallpaperEngine : Engine() {
+ // ... existing variables
+ private val handler = Handler(Looper.getMainLooper())
+ private var isVisible = false
+ private val updateRunnable = object : Runnable {
+ override fun run() {
+ // Redraw wallpaper with current time
+ drawWallpaper()
+ // Schedule next update in 60 seconds
+ if (isVisible) {
+ handler.postDelayed(this, 60000)
+ }
+ }
+ }
+}
+Runnable Explanation:
+object : Runnable creates anonymous Runnable instance
+run() contains update logic
+Redraws wallpaper (which gets current time)
+Reschedules itself after 60 seconds
+Only reschedules if wallpaper is visible
+9.3 Visibility Lifecycle Management
+Override onVisibilityChanged:
+Kotlin
+override fun onVisibilityChanged(visible: Boolean) {
+ super.onVisibilityChanged(visible)
+ isVisible = visible
+ if (visible) {
+ // Wallpaper became visible - start updates
+ handler.post(updateRunnable)
+ } else {
+ // Wallpaper hidden - stop updates
+ handler.removeCallbacks(updateRunnable)
+ }
+}
+When Visibility Changes:
+Visible = true:
+User viewing home screen with this wallpaper
+Screen is on
+Wallpaper is active (not replaced)
+Visible = false:
+Screen turned off (lock screen)
+User switched to different wallpaper
+Device sleeping
+App drawer opened (overlays wallpaper)
+Battery Optimization:
+Stopping updates when invisible crucial for battery life
+Avoids unnecessary CPU wake-ups
+Only draws when actually displayed
+9.4 Initial Update Trigger
+Modify onSurfaceChanged:
+Kotlin
+override fun onSurfaceChanged(
+ holder: SurfaceHolder,
+ format: Int,
+ width: Int,
+ height: Int
+) {
+ super.onSurfaceChanged(holder, format, width, height)
+ canvasWidth = width
+ canvasHeight = height
+ // Initial draw
+ drawWallpaper()
+ // Start update loop if visible
+ if (isVisible) {
+ handler.post(updateRunnable)
+ }
+}
+Why Here:
+Surface ready for first draw
+Dimensions known
+Triggers initial render + starts update cycle
+9.5 Cleanup on Destroy
+Update onDestroy:
+Kotlin
+override fun onDestroy() {
+ super.onDestroy()
+ // Stop all scheduled updates
+ handler.removeCallbacks(updateRunnable)
+ // Cleanup bitmaps
+ backgroundBitmap?.recycle()
+ foregroundBitmap?.recycle()
+}
+Importance:
+Prevents memory leaks
+Removes pending Runnable from message queue
+Essential for proper resource cleanup
+Handler holds reference to Engine - must clear
+9.6 Precise Timing Optimization
+Problem:
+postDelayed(60000) starts timer from now
+If current time 10:30:37, next update at 10:31:37 (not 10:31:00)
+Clock appears to skip seconds
+Solution - Sync to Minute Boundary:
+Kotlin
+private fun scheduleNextUpdate() {
+ // Get current time
+ val now = Calendar.getInstance()
+ val seconds = now.get(Calendar.SECOND)
+ val milliseconds = now.get(Calendar.MILLISECOND)
+ // Calculate delay to next minute boundary
+ val delayToNextMinute = (60 - seconds) * 1000 - milliseconds
+ // Schedule update at next minute
+ handler.postDelayed(updateRunnable, delayToNextMinute.toLong())
+}
+Enhanced Runnable:
+Kotlin
+private val updateRunnable = object : Runnable {
+ override fun run() {
+ drawWallpaper()
+ if (isVisible) {
+ scheduleNextUpdate() // Use precise scheduling
+ }
+ }
+}
+Benefit:
+Clock updates exactly at minute change (10:31:00, not 10:31:37)
+Feels more accurate and responsive
+No perceived drift
+9.7 Update on Screen Wake
+Override onVisibilityChanged Enhancement:
+Kotlin
+override fun onVisibilityChanged(visible: Boolean) {
+ super.onVisibilityChanged(visible)
+ isVisible = visible
+ if (visible) {
+ // Draw immediately (show current time right away)
+ drawWallpaper()
+ // Schedule next update
+ scheduleNextUpdate()
+ } else {
+ handler.removeCallbacks(updateRunnable)
+ }
+}
+Why Immediate Draw:
+User wakes device, expects to see current time
+Without immediate draw, shows stale time until next scheduled update
+Better UX - instant feedback
+9.8 Testing Time Updates
+Manual Testing:
+Set wallpaper
+Note current time (e.g., 10:30)
+Wait until next minute (10:31)
+Verify clock updates to 10:31
+Lock screen (turn off display)
+Wait 2 minutes
+Unlock screen
+Verify clock shows current time (not frozen)
+Automated Testing (ADB Commands):
+Bash
+# Watch logcat for update events
+adb logcat | grep "WallpaperUpdate"
+# Simulate screen on/off
+adb shell input keyevent KEYCODE_POWER
+# Change system time (testing only)
+adb shell su -c "date 123123302024.00"
+Logging for Debug:
+Kotlin
+private val updateRunnable = object : Runnable {
+ override fun run() {
+ Log.d("DepthWallpaper", "Updating time: ${getCurrentTime()}")
+ drawWallpaper()
+ if (isVisible) {
+ scheduleNextUpdate()
+ }
+ }
+}
+9.9 Edge Cases & Error Handling
+Case 1: Rapid Visibility Changes
+User quickly locks/unlocks screen
+Multiple updates scheduled
+Solution: removeCallbacks before posting new one
+Case 2: System Time Change
+User changes time zone or time manually
+Updates continue at old schedule
+Solution: Acceptable (updates at next scheduled interval)
+Enhancement: Listen to TIME_CHANGED broadcast (optional)
+Case 3: Long Sleep
+Device asleep for hours
+Wallpaper invisible
+No updates during sleep
+On wake: immediate draw shows correct time
+Works correctly without modification
+Case 4: Wallpaper Replaced Mid-Update
+User changes wallpaper while update scheduled
+onDestroy called
+removeCallbacks prevents orphaned Runnable
+No memory leak
+9.10 Battery Impact Analysis
+Measurement:
+Baseline: Static wallpaper (Module 8) - minimal impact
+With updates: Wake up once per minute
+CPU usage: <1% (brief draw operation)
+Battery drain: ~1-2% per 8 hours (negligible)
+Optimization Achieved:
+Updates only when visible
+No continuous polling
+Efficient canvas redraw (cached bitmaps)
+Handler more efficient than AlarmManager for short intervals
+9.11 Seconds Display (Optional)
+If Clock Format Includes Seconds (HH:MM:SS):
+Need more frequent updates:
+Kotlin
+private fun getUpdateInterval(): Long {
+ return if (config.clockFormat.contains("SS")) {
+ 1000 // Update every second
+ } else {
+ 60000 // Update every minute
+ }
+}
+private val updateRunnable = object : Runnable {
+ override fun run() {
+ drawWallpaper()
+ if (isVisible) {
+ handler.postDelayed(this, getUpdateInterval())
+ }
+ }
+}
+Battery Trade-off:
+Seconds format = 60× more updates
+Higher battery usage (still minimal)
+User choice - offer warning in UI
+9.12 Integration with Existing Code
+No Changes to Drawing Logic:
+getCurrentTime() already gets current time
+drawWallpaper() already redraws clock
+Only changes: when to call drawWallpaper()
+No Flutter Changes:
+Updates happen entirely in Kotlin
+Flutter app can be closed
+Wallpaper updates independently
+9.13 Testing Checklist
+Functional Tests:
+ Clock updates every minute
+ Updates stop when screen off
+ Updates resume when screen on
+ Time displayed is accurate
+ Updates synchronized to minute boundary
+ No visible lag or stuttering
+ Seconds format updates every second (if implemented)
+Battery Tests:
+ Monitor battery drain over 8 hours
+ Verify CPU usage minimal (<1%)
+ Check wake locks (should be none)
+ Compare to static wallpaper baseline
+Stability Tests:
+ Run for 24 hours - no crashes
+ Lock/unlock rapidly 100 times - stable
+ Change wallpaper multiple times - no memory leak
+ Force close app - wallpaper continues updating
+Expected Outcomes:
+Clock shows current time always
+Updates automatically every minute
+No manual refresh needed
+Battery impact negligible (<2% per day)
+Updates stop when screen off (battery saving)
+Immediate update on screen wake
+No memory leaks or crashes
+Smooth operation over days/weeks
+Testing Criteria:
+Set wallpaper at 10:30 → see 10:30
+Wait until 10:31 → clock changes to 10:31
+Lock screen, wait 5 minutes → unlock → shows 10:36 (current time)
+Keep screen on for 10 minutes → clock updates every minute
+Battery drain test: <5% over 24 hours
+Memory profiler: no growing memory usage
+Logcat: no error messages related to updates
+User Experience:
+text
+User sets wallpaper at 2:30 PM
+ → Clock shows 2:30
+ → User uses phone normally
+ → At 2:31 PM, clock automatically updates
+ → User locks phone at 2:35 PM
+ → Phone sleeping (updates stopped)
+ → User unlocks at 3:15 PM
+ → Clock immediately shows 3:15 (not frozen at 2:35)
+ → Updates continue every minute
+ → User satisfied - "just works"
+Key Files to Modify:
+android/.../DepthWallpaperService.kt - Add Handler, Runnable, lifecycle methods
+No New Dependencies
+Uses Android's built-in Handler/Looper system
+Critical Notes for AI Agent:
+Handler must be on main looper (UI thread)
+Always removeCallbacks in onDestroy (memory leak prevention)
+postDelayed doesn't guarantee exact timing (close enough for clock)
+Visibility management crucial for battery life
+Test on real device with screen on/off cycles
+Consider seconds format battery impact (warn user)
+Handler holds strong reference to Runnable - must clear
+Immediate draw on visibility change improves UX significantly
+  MODULE 10: Date Widget & Advanced Features
+Objective:
+Add optional date display below/beside clock with full customization options, plus implement remaining 
+advanced features like date settings and visual polish.
+Detailed Requirements:
+10.1 Date Tab Layout
+Create DateTab widget:
+Layout Structure:
+text
+ListView (scrollable, 16dp padding)
+ ├── Display Date Toggle
+ │ └── SwitchListTile
+ │
+ ├── Spacer (24dp)
+ │
+ ├── Font Size Slider
+ │ (same style as Basics tab)
+ │
+ ├── Spacer (24dp)
+ │
+ ├── Horizontal Position Slider
+ │
+ ├── Spacer (24dp)
+ │
+ └── Vertical Position Slider
+10.2 Date Display Toggle
+Purpose:
+User chooses whether to show date widget
+UI Component:
+text
+SwitchListTile
+- Title: "Show Date"
+- Active color: Yellow (#FFD700)
+- Default: false (off)
+Config Property:
+text
+Add to WallpaperConfig:
+- showDate: bool (default false)
+Behavior:
+When enabled: date widget appears in preview
+When disabled: date hidden, other settings inactive (grayed out)
+Can be toggled on/off anytime
+10.3 Date Positioning Controls
+Same Slider Design as Clock (Module 5):
+Font Size Slider:
+Range: 0.01 to 0.1 (1% to 10% of screen width)
+Initial: 0.034 (3.4%)
+Display: Percentage "3.4%"
+Note: Date text smaller than clock
+Horizontal Position Slider:
+Range: 0.0 to 1.0
+Initial: 0.78 (78% from left)
+Right-aligned positioning
+Vertical Position Slider:
+Range: 0.0 to 1.0
+Initial: 0.11 (11% from top)
+Below clock typically
+Config Properties:
+text
+Add to WallpaperConfig:
+- dateFontSize: double (default 0.034)
+- dateHorizontalPos: double (default 0.78)
+- dateVerticalPos: double (default 0.11)
+10.4 Date Settings Tab Layout
+Create DateSettingsTab widget:
+Layout Structure:
+text
+ListView (scrollable, 16dp padding)
+ ├── Font Color Section
+ │ ├── Section label: "Font Color"
+ │ └── Color picker (same as Typography tab)
+ │
+ ├── Spacer (24dp)
+ │
+ ├── Date Format Section (Optional)
+ │ ├── Section label: "Date Format"
+ │ └── Chip selector (formats)
+ │
+ ├── Spacer (24dp)
+ │
+ └── Text Style Section
+ ├── All Caps Toggle (SwitchListTile)
+ └── Bold Toggle (SwitchListTile)
+10.5 Date Color Picker
+Purpose:
+Set date text color independently from clock
+Implementation:
+Reuse ColorPickerWidget from Module 6
+Same 8 predefined colors
+Separate from clock color
+Config Property:
+text
+Add to WallpaperConfig:
+- dateColor: Color (default Colors.white)
+10.6 Date Format Options
+Purpose:
+Choose date display format
+Format Choices:
+"EEE, MMM dd" → "Mon, Jan 15"
+"MMM dd, yyyy" → "Jan 15, 2024"
+"dd/MM/yyyy" → "15/01/2024"
+"MM-dd-yyyy" → "01-15-2024"
+"EEEE, MMMM dd" → "Monday, January 15"
+Config Property:
+text
+Add to WallpaperConfig:
+- dateFormat: String (default "EEE, MMM dd")
+UI Component:
+ChoiceChip selector (same style as clock format)
+Horizontal wrap layout
+10.7 Text Style Controls
+All Caps Toggle:
+text
+SwitchListTile
+- Title: "All Caps"
+- Active color: Yellow
+- Default: true
+Effect:
+When enabled: "MON, JAN 15"
+When disabled: "Mon, Jan 15"
+Bold Toggle:
+text
+SwitchListTile
+- Title: "Bold Text"
+- Active color: Yellow
+- Default: false
+Effect:
+When enabled: FontWeight.bold
+When disabled: FontWeight.normal
+Config Properties:
+text
+Add to WallpaperConfig:
+- dateAllCaps: bool (default true)
+- dateBold: bool (default false)
+10.8 Preview Integration
+Update WallpaperPreview Widget:
+Add date layer to Stack (after foreground):
+text
+Stack(
+ children: [
+ // Layer 1: Background
+ // Layer 2: Clock
+ // Layer 3: Foreground
+ // Layer 4: Date (if enabled)
+ if (config.showDate)
+ Positioned(
+ left: config.dateHorizontalPos * constraints.maxWidth,
+ top: config.dateVerticalPos * constraints.maxHeight,
+ child: Text(
+ getFormattedDate(config.dateFormat, config.dateAllCaps),
+ style: TextStyle(
+ fontSize: config.dateFontSize * constraints.maxWidth,
+ color: config.dateColor,
+ fontWeight: config.dateBold ? FontWeight.bold : FontWeight.normal,
+ ),
+ ),
+ ),
+ ]
+)
+Date Formatting Method:
+dart
+String getFormattedDate(String format, bool allCaps) {
+ final now = DateTime.now();
+ final formatter = DateFormat(format);
+ String dateText = formatter.format(now);
+ return allCaps ? dateText.toUpperCase() : dateText;
+}
+Layer Order Note:
+Date renders AFTER foreground (on top)
+Not subject to depth effect
+Always visible (not occluded by subject)
+Design choice: date as UI element, not part of depth scene
+10.9 Kotlin WallpaperService Updates
+Add Date Drawing to drawWallpaper():
+Kotlin
+private fun drawWallpaper() {
+ val canvas = surfaceHolder.lockCanvas() ?: return
+ try {
+ drawBackground(canvas)
+ drawClock(canvas)
+ drawForeground(canvas)
+ // Add date drawing
+ if (config.showDate) {
+ drawDate(canvas)
+ }
+ } finally {
+ surfaceHolder.unlockCanvasAndPost(canvas)
+ }
+}
+Date Drawing Method:
+Kotlin
+private fun drawDate(canvas: Canvas) {
+ val datePaint = Paint().apply {
+ color = config.dateColor
+ textSize = config.dateFontSize * canvas.width
+ isAntiAlias = true
+ typeface = if (config.dateBold) {
+ Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+ } else {
+ Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+ }
+ }
+ val dateText = getFormattedDate()
+ val x = config.dateHorizontalPos * canvas.width
+ val y = config.dateVerticalPos * canvas.height
+ canvas.drawText(dateText, x, y, datePaint)
+}
+Date Formatting in Kotlin:
+Kotlin
+private fun getFormattedDate(): String {
+ val pattern = when (config.dateFormat) {
+ "MMM dd, yyyy" -> "MMM dd, yyyy"
+ "dd/MM/yyyy" -> "dd/MM/yyyy"
+ "MM-dd-yyyy" -> "MM-dd-yyyy"
+ "EEEE, MMMM dd" -> "EEEE, MMMM dd"
+ else -> "EEE, MMM dd" // Default
+ }
+ val sdf = SimpleDateFormat(pattern, Locale.getDefault())
+ var dateText = sdf.format(Date())
+ if (config.dateAllCaps) {
+ dateText = dateText.uppercase()
+ }
+ return dateText
+}
+10.10 Date Update Schedule
+Problem:
+Date only changes once per day (at midnight)
+Current update: every minute (wasteful)
+Solution - Midnight Update:
+Kotlin
+private fun scheduleNextUpdate() {
+ val now = Calendar.getInstance()
+ // Schedule for time update (every minute)
+ val delayToNextMinute = calculateMinuteDelay(now)
+ handler.postDelayed(updateRunnable, delayToNextMinute)
+ // If showing date, also schedule midnight update
+ if (config.showDate) {
+ val delayToMidnight = calculateMidnightDelay(now)
+ handler.postDelayed(midnightRunnable, delayToMidnight)
+ }
+}
+private fun calculateMidnightDelay(now: Calendar): Long {
+ val tomorrow = Calendar.getInstance().apply {
+ add(Calendar.DAY_OF_MONTH, 1)
+ set(Calendar.HOUR_OF_DAY, 0)
+ set(Calendar.MINUTE, 0)
+ set(Calendar.SECOND, 0)
+ set(Calendar.MILLISECOND, 0)
+ }
+ return tomorrow.timeInMillis - now.timeInMillis
+}
+private val midnightRunnable = Runnable {
+ drawWallpaper() // Redraw with new date
+ // Schedule next midnight update
+ if (isVisible && config.showDate) {
+ handler.postDelayed(this, 24 * 60 * 60 * 1000L) // 24 hours
+ }
+}
+Cleanup in onDestroy:
+Kotlin
+override fun onDestroy() {
+ super.onDestroy()
+ handler.removeCallbacks(updateRunnable)
+ handler.removeCallbacks(midnightRunnable)
+ // ... rest of cleanup
+}
+10.11 Advanced Features
+Feature 1: Secondary Color Gradient (Optional)
+Purpose:
+Use secondary color for gradient effect on clock
+Implementation (Kotlin):
+Kotlin
+private fun createGradientPaint(): Paint {
+ val paint = Paint().apply {
+ textSize = config.fontSize * canvasWidth
+ isAntiAlias = true
+ if (config.secondaryColor != null) {
+ shader = LinearGradient(
+ 0f, 0f,
+ textSize, 0f,
+ config.fontColor,
+ config.secondaryColor!!,
+ Shader.TileMode.CLAMP
+ )
+ } else {
+ color = config.fontColor
+ }
+ }
+ return paint
+}
+Feature 2: Depth Layering Modes (Implemented Now)
+Recall from Module 6: Hours Forward, Minutes Forward
+Implementation:
+Kotlin
+private fun drawClock(canvas: Canvas) {
+ val time = getCurrentTime()
+ when (config.depthMode) {
+ "Standard" -> {
+ // Draw entire clock before foreground
+ drawCompleteTime(canvas, time)
+ }
+ "Hours Forward" -> {
+ // Draw minutes
+ drawMinutesOnly(canvas, time)
+ // Then in separate method after foreground:
+ // drawHoursOnly(canvas, time)
+ }
+ "Minutes Forward" -> {
+ // Draw hours
+ drawHoursOnly(canvas, time)
+ // Then after foreground:
+ // drawMinutesOnly(canvas, time)
+ }
+ }
+}
+private fun drawMinutesOnly(canvas: Canvas, time: String) {
+ // Parse time, extract minutes (e.g., "30" from "14:30")
+ val minutes = time.split(":").getOrNull(1) ?: return
+ // Draw only minutes at adjusted position
+}
+private fun drawHoursOnly(canvas: Canvas, time: String) {
+ // Parse time, extract hours
+ val hours = time.split(":").getOrNull(0) ?: return
+ // Draw only hours
+}
+Drawing Order for "Hours Forward":
+Kotlin
+private fun drawWallpaper() {
+ canvas.lock()
+ drawBackground()
+ drawMinutesOnly() // Behind foreground
+ drawForeground()
+ drawHoursOnly() // In front of foreground
+ drawDate() // Always on top
+ canvas.unlock()
+}
+10.12 Tab Navigation Update
+Add Date Tab to Studio Screen:
+Update TabController:
+dart
+_tabController = TabController(length: 6, vsync: this); // Was 5, now 6
+Update TabBar:
+dart
+TabBar(
+ controller: _tabController,
+ tabs: [
+ Tab(text: 'Basics'),
+ Tab(text: 'Typography'),
+ Tab(text: 'Effects'),
+ Tab(text: 'Transform'),
+ Tab(text: 'Date'),
+ Tab(text: 'Date Settings'),
+ ],
+)
+Update TabBarView:
+dart
+TabBarView(
+ controller: _tabController,
+ children: [
+ BasicsTab(...),
+ TypographyTab(...),
+ EffectsTab(...),
+ TransformTab(...),
+ DateTab(...), // New
+ DateSettingsTab(...), // New
+ ],
+)
+10.13 Config Persistence
+Add to MethodChannel saveConfig:
+dart
+await platform.invokeMethod('saveConfig', {
+ // ... existing config
+ 'showDate': wallpaperConfig.showDate,
+ 'dateFontSize': wallpaperConfig.dateFontSize,
+ 'dateHorizontalPos': wallpaperConfig.dateHorizontalPos,
+ 'dateVerticalPos': wallpaperConfig.dateVerticalPos,
+ 'dateColor': wallpaperConfig.dateColor.value,
+ 'dateFormat': wallpaperConfig.dateFormat,
+ 'dateAllCaps': wallpaperConfig.dateAllCaps,
+ 'dateBold': wallpaperConfig.dateBold,
+});
+SharedPreferences in Kotlin:
+Kotlin
+putBoolean("showDate", config["showDate"] as Boolean)
+putFloat("dateFontSize", (config["dateFontSize"] as Double).toFloat())
+putFloat("dateHorizontalPos", (config["dateHorizontalPos"] as Double).toFloat())
+putFloat("dateVerticalPos", (config["dateVerticalPos"] as Double).toFloat())
+putInt("dateColor", config["dateColor"] as Int)
+putString("dateFormat", config["dateFormat"] as String)
+putBoolean("dateAllCaps", config["dateAllCaps"] as Boolean)
+putBoolean("dateBold", config["dateBold"] as Boolean)
+Expected Outcomes:
+Date widget fully functional
+Toggle on/off working
+Customizable size, position, color
+Multiple format options
+All caps/bold styling
+Updates at midnight automatically
+Depth layering modes working
+Gradient effect (if secondary color set)
+Preview shows all features
+Wallpaper renders correctly
+Testing Criteria:
+Enable date → appears in preview
+Disable date → disappears
+Adjust date position → moves correctly
+Change date color → updates
+Select format → displays in that format
+All caps on → uppercase date
+Bold toggle → weight changes
+Apply wallpaper → date shows on home screen
+Wait until midnight → date updates to next day
+Hours Forward mode → hours appear above foreground
+User Experience Flow:
+text
+User switches to Date tab
+ → Enables "Show Date" toggle
+ → Date appears in preview: "MON, JAN 15"
+ → Adjusts position below clock
+ → Makes text smaller (3%)
+User switches to Date Settings tab
+ → Changes color to yellow
+ → Selects format "Jan 15, 2024"
+ → Disables all caps
+ → Preview shows: "Jan 15, 2024" in yellow, normal case
+User applies wallpaper
+ → Home screen shows clock + date
+ → Next day at midnight: date automatically updates
+Key Files to Create:
+widgets/date_tab.dart - Date positioning controls
+widgets/date_settings_tab.dart - Date styling controls
+Updated models/wallpaper_config.dart - Add 8 date properties
+Updated widgets/wallpaper_preview.dart - Render date layer
+Updated android/.../DepthWallpaperService.kt - Date drawing + midnight updates
+Dependencies:
+YAML
+intl: ^0.18.1 # For DateFormat in Flutter
+Critical Notes for AI Agent:
+Date layer renders AFTER foreground (always visible, not depth effect)
+Midnight update prevents wasteful minute-by-minute updates when date doesn't change
+Date format patterns must match between Dart (DateFormat) and Kotlin (SimpleDateFormat)
+All caps transformation happens after formatting
+Depth layering mode requires sketching clock into hours/minutes components
+Secondary color gradient optional (null check required)
+Date and clock can have different colors/sizes (independent styling)
+Test midnight update by manually changing system time
+ MODULE 11: Project Management & Polish - Detailed Explanation
+ MODULE OVERVIEW
+Purpose: Transform app from single-use tool to full project management system with professional UI/UX 
+polish
+Current State (After Module 10):
+User can create ONE wallpaper
+No way to save/load multiple designs
+No history or project organization
+Basic UI without animations
+Target State (After Module 11):
+Multiple saved projects with thumbnails
+Edit/Delete/Duplicate functionality
+Smooth animations throughout
+Professional error handling
+First-launch onboarding
+Settings screen
+ SUB-MODULE 11.1: Local Database Architecture
+What You're Building:
+A persistent storage system to save multiple wallpaper projects
+Why It Matters:
+Users want to experiment with different designs
+Need to switch between wallpapers easily
+Preserve work without re-creating from scratch
+Technical Approach:
+Option A: Hive (Recommended)
+Pros:
+ Pure Dart (no platform channels)
+ Fast (NoSQL key-value store)
+ Type-safe with code generation
+ Small footprint
+Cons:
+ Less flexible for complex queries
+ Manual relationship management
+Option B: SQLite (sqflite)
+Pros:
+ Relational database (good for complex queries)
+ Industry standard
+ Better for large datasets
+Cons:
+ More boilerplate code
+ Requires SQL knowledge
+Data Models You'll Create:
+1. WallpaperProject
+text
+Fields:
+- id (String) - Unique identifier (UUID)
+- name (String) - User-given name or auto "Wallpaper 1"
+- createdAt (DateTime) - When project was created
+- modifiedAt (DateTime) - Last edit timestamp
+- thumbnailPath (String) - Path to preview image
+- isActive (bool) - Currently set as wallpaper
+- originalImagePath (String) - User's uploaded photo
+- backgroundImagePath (String) - Processed background
+- foregroundImagePath (String) - Segmented subject
+- configJson (String) - Serialized WallpaperConfig
+2. AppSettings
+text
+Fields:
+- qualityPreset (String) - "high", "balanced", "battery_saver"
+- updateFrequency (int) - Minutes between clock updates
+- showOnboardingAgain (bool) - Reset tutorial flag
+- lastBackupDate (DateTime) - Last export timestamp
+Database Operations You'll Implement:
+CREATE:
+text
+When user completes Studio editing:
+1. Generate UUID
+2. Save thumbnail (render preview as PNG)
+3. Serialize WallpaperConfig to JSON
+4. Insert into database
+5. Navigate back to home
+READ:
+text
+On Home Screen load:
+1. Query all projects
+2. Sort by modifiedAt (newest first)
+3. Display as grid/list
+4. Highlight active project
+UPDATE:
+text
+When user edits existing project:
+1. Load project by ID
+2. User makes changes in Studio
+3. Update modifiedAt timestamp
+4. Save updated config
+5. Regenerate thumbnail if visual changes
+DELETE:
+text
+When user deletes project:
+1. Show confirmation dialog
+2. If confirmed:
+ - Delete from database
+ - Delete associated files (images, thumbnail)
+ - If was active, clear active flag
+3. Refresh home screen list
+ SUB-MODULE 11.2: Home Screen Redesign
+What You're Building:
+Professional project management interface replacing the empty home screen
+Layout Components:
+A. Header Section
+text
+┌─────────────────────────────────────┐
+│ Depth Wallpaper [ Settings] │
+│ │
+│ My Wallpapers (5) [Sort▼] │
+└─────────────────────────────────────┘
+Features:
+App title/logo
+Settings gear icon (top-right)
+Project count
+Sort dropdown (by date, name, recently used)
+B. Quick Action Cards
+text
+┌─────────────────────────────────────┐
+│ ┌──────────────┐ ┌──────────────┐│
+│ │ + CREATE │ │ IMPORT ││
+│ │ NEW │ │ PROJECT ││
+│ └──────────────┘ └──────────────┘│
+└─────────────────────────────────────┘
+Features:
+Prominent "Create New" button (same as FAB)
+Import button for restoring backed-up projects
+C. Project Grid/List
+text
+Grid View:
+┌─────┬─────┬─────┐
+│ IMG │ IMG │ IMG │
+│12:30│12:30│12:30│
+│ │ │ │ ← 3-dot menu
+└─────┴─────┴─────┘
+List View:
+┌─────────────────────────────────────┐
+│ [IMG] Project Name │
+│ Modified: 2 hours ago │
+│ Active │
+└─────────────────────────────────────┘
+Grid Item Components:
+Thumbnail Image (aspect ratio 9:19.5)
+Clock Preview (current time rendered)
+Active Indicator (badge/border)
+3-dot Menu (edit, duplicate, delete, share)
+D. Empty State
+text
+When no projects:
+┌─────────────────────────────────────┐
+│ │
+│ [Large Icon] │
+│ │
+│ No Wallpapers Yet │
+│ Create your first depth │
+│ wallpaper to get started │
+│ │
+│ [+ Create Wallpaper] │
+│ │
+└─────────────────────────────────────┘
+Interaction Flows:
+Tap Project Card:
+Opens preview dialog
+Shows "Set as Wallpaper" and "Edit" buttons
+Long-press Card:
+Enters selection mode
+Allows multi-select for batch delete
+3-dot Menu:
+text
+Options:
+- Edit
+- Set as Wallpaper
+- Duplicate
+- Share (export as image/config)
+- Delete
+ SUB-MODULE 11.3: UI Animations & Transitions
+What You're Building:
+Smooth, professional animations that guide user attention
+Animation Categories:
+A. Navigation Transitions
+1. Home → Studio (Hero Animation)
+text
+Concept:
+- Project thumbnail smoothly expands into Studio preview
+- Creates visual continuity
+Implementation approach:
+- Wrap thumbnail in Hero widget with unique tag
+- Match tag in Studio preview
+- Flutter handles morphing automatically
+2. Studio → Preview (Slide Up)
+text
+Concept:
+- Full-screen preview slides up from bottom
+- Dismissible by dragging down
+Implementation approach:
+- Use PageRouteBuilder with SlideTransition
+- Add DraggableScrollableSheet for dismiss gesture
+B. List Animations
+1. Staggered Grid Entrance
+text
+Concept:
+- Project cards appear one-by-one with slight delay
+- Creates polished loading experience
+Implementation approach:
+- Use AnimationController with staggered delays
+- FadeTransition + SlideTransition combination
+- Each item delays by index * 50ms
+2. Delete Animation
+text
+Concept:
+- Card scales down while fading out
+- Other cards smoothly reposition
+Implementation approach:
+- AnimatedList for insertions/deletions
+- SizeTransition + FadeTransition
+- Duration: 300ms
+C. Interactive Feedback
+1. Slider Value Changes
+text
+Concept:
+- Preview updates smoothly, not instantly
+- Percentage display animates numerically
+Implementation approach:
+- TweenAnimationBuilder for value changes
+- Duration: 200ms
+- Cubic ease curve
+2. Tab Switches
+text
+Concept:
+- Content fades out → new content fades in
+- Indicator slides smoothly
+Implementation approach:
+- AnimatedSwitcher for content
+- Duration: 300ms
+- Custom SlideTransition for indicator
+3. Button Press States
+text
+Concept:
+- Subtle scale effect on tap
+- Color change on hold
+Implementation approach:
+- GestureDetector with onTapDown/onTapUp
+- AnimatedContainer for smooth scaling
+- InkWell for material ripple effect
+D. Loading States
+1. Image Processing Overlay
+text
+Concept:
+- Full-screen dimmed overlay
+- Spinner with progress text
+- Optional percentage if ML Kit provides progress
+Visual:
+┌─────────────────────────────────────┐
+│ [Black overlay 80%] │
+│ │
+│ Processing... │
+│ Detecting subject │
+│ ▬▬▬▬▬▬▬░░░░ 60% │
+│ │
+└─────────────────────────────────────┘
+2. Shimmer Placeholders
+text
+Concept:
+- While loading project list, show shimmer skeletons
+- Indicates loading without blocking UI
+Implementation approach:
+- Use shimmer package
+- Create placeholder cards matching real card size
+- Replace with actual content when loaded
+ SUB-MODULE 11.4: Settings Screen
+What You're Building:
+Configuration hub for app-wide preferences
+Settings Categories:
+A. Performance Settings
+text
+Section Header: "Performance"
+Quality Preset [Radio Buttons]:
+○ High Quality
+ - 4K wallpaper rendering
+ - Higher battery usage
+● Balanced (Default)
+ - 1080p rendering
+ - Moderate battery
+○ Battery Saver
+ - 720p rendering
+ - Minimal updates
+Technical Implementation:
+Affects bitmap resolution in ML Kit
+Changes canvas rendering size in WallpaperService
+Adjusts update frequency
+B. Update Behavior
+text
+Section Header: "Clock Updates"
+ Update Every Minute
+ When enabled: Clock redraws every 60s
+ When disabled: Only updates on screen wake
+ Update on Screen Wake
+ Always refresh when screen turns on
+Time Format [Dropdown]:
+▼ 24-hour
+ 12-hour (AM/PM)
+C. Display Options
+text
+Section Header: "Display"
+ Lock Screen Only
+ If checked: Only show depth effect on lock screen
+ Home screen uses standard wallpaper
+ Show Grid in Preview
+ Overlay 3×3 grid for positioning assistance
+ Show FPS Counter (Debug)
+ Display rendering performance
+D. Data Management
+text
+Section Header: "Data & Storage"
+Cache Size: 124 MB [Clear Cache]
+Projects: 5 [View All]
+[Export All Projects]
+ → Opens share sheet with .zip file
+[Import Projects]
+ → File picker for .zip restore
+[Reset All Settings]
+ → Confirmation dialog → restore defaults
+E. About & Legal
+text
+Section Header: "About"
+Version: 1.0.0 (Build 42)
+[Privacy Policy]
+[Terms of Service]
+[Open Source Licenses]
+[Rate on Play Store]
+[Contact Support]
+Made with in [Your Location]
+Settings Persistence:
+text
+Storage mechanism:
+- Use SharedPreferences for simple key-value pairs
+- Load on app start
+- Apply throughout app lifecycle
+Example keys:
+- quality_preset: "balanced"
+- update_every_minute: true
+- use_24hour: true
+- show_grid: false
+ SUB-MODULE 11.5: Onboarding Flow
+What You're Building:
+First-time user experience explaining app features
+Screen Sequence:
+Screen 1: Welcome
+text
+┌─────────────────────────────────────┐
+│ │
+│ [Animated App Logo] │
+│ │
+│ Create iOS-Style Wallpapers │
+│ on Android │
+│ │
+│ Transform your photos into │
+│ stunning depth effect wallpapers │
+│ │
+│ [Get Started →] │
+│ │
+└─────────────────────────────────────┘
+Animation: Logo fades in with scale effect
+Screen 2: Feature Highlights (PageView)
+text
+Page 1/3:
+┌─────────────────────────────────────┐
+│ [Illustration: Photo upload] │
+│ │
+│ Select Any Photo │
+│ │
+│ Choose from your gallery or │
+│ take a new photo │
+│ │
+│ ● ○ ○ [Next] │
+└─────────────────────────────────────┘
+Page 2/3:
+┌─────────────────────────────────────┐
+│ [Illustration: AI magic] │
+│ │
+│ AI-Powered Detection │
+│ │
+│ Our smart algorithm automatically │
+│ isolates the subject │
+│ │
+│ ○ ● ○ [Next] │
+└─────────────────────────────────────┘
+Page 3/3:
+┌─────────────────────────────────────┐
+│ [Illustration: Depth effect] │
+│ │
+│ Customize Everything │
+│ │
+│ Style your clock with fonts, │
+│ colors, effects & more │
+│ │
+│ ○ ○ ● [Finish] │
+└─────────────────────────────────────┘
+Interaction:
+Swipeable pages
+Dot indicators show progress
+Skip button in top-right (all screens)
+Screen 3: Permissions Request
+text
+┌─────────────────────────────────────┐
+│ We Need Your Permission │
+│ │
+│ Photo Access │
+│ Required to select wallpaper │
+│ images from your gallery │
+│ │
+│ Live Wallpaper │
+│ Required to display your │
+│ creations on your screen │
+│ │
+│ [Grant Permissions] │
+│ [I'll do this later] │
+│ │
+└─────────────────────────────────────┘
+Flow:
+Tap "Grant Permissions"
+System permission dialogs appear
+If granted → Navigate to Home
+If denied → Show warning, still allow entry
+Screen 4: Quick Tutorial (Optional)
+text
+Interactive overlay on first Studio visit:
+Step 1: Highlights image picker button
+ "Tap here to select a photo"
+ [Tooltip with arrow pointing to button]
+Step 2: After image selected
+ "Great! Now AI will detect the subject"
+ [Overlay on preview area]
+Step 3: After processing
+ "Adjust the clock position and style"
+ [Highlights slider controls]
+Step 4: Final step
+ "Tap here when ready to apply"
+ [Highlights checkmark button]
+Implementation Strategy:
+Use Showcaseview or Tutorial Coach Mark package
+Store completion in SharedPreferences
+"Don't show again" checkbox
+ SUB-MODULE 11.6: Error Handling & Edge Cases
+What You're Building:
+Robust error management for graceful failures
+Error Scenarios & Solutions:
+A. Image Processing Errors
+1. ML Kit Returns No Subject
+text
+User Impact:
+- Processing completes but foreground is empty
+Solution:
+┌─────────────────────────────────────┐
+│ No Subject Detected │
+│ │
+│ We couldn't find a clear subject │
+│ in this photo. │
+│ │
+│ [Try Another Photo] │
+│ [Continue Anyway] │
+│ [Manual Selection] ← Future feature│
+└─────────────────────────────────────┘
+Fallback behavior:
+- If "Continue Anyway": Use full image as background
+- Save project with warning flag
+2. Image File Corrupted
+text
+User Impact:
+- App crashes when loading saved project
+Solution:
+- Try-catch around file I/O
+- If fails: Show error, remove project from list
+- Log error for debugging
+Dialog:
+"This project is corrupted and can't be loaded.
+Would you like to delete it?"
+[Delete] [Cancel]
+3. Out of Memory (Large Images)
+text
+User Impact:
+- App crashes when loading 20MP+ images
+Solution:
+- Always downsample images before processing
+- Set max resolution to 2048px width
+- Show warning if original > 4K:
+"This image is very large (8000×6000).
+We'll optimize it for better performance."
+[OK]
+B. Wallpaper Service Errors
+1. Service Fails to Start
+text
+User Impact:
+- Wallpaper doesn't appear after applying
+Solution:
+- Add health check in WallpaperService onCreate
+- If critical files missing, show notification:
+"Wallpaper couldn't start. Tap to recreate."
+Recovery:
+- Notification tap → reopens Studio
+- Automatically reprocess last project
+2. Config Loading Fails
+text
+User Impact:
+- Wallpaper shows with default values
+Solution:
+- Load default config as fallback
+- Log error but don't crash
+- Toast message: "Using default settings"
+C. Permission Denied
+1. Storage Permission Denied
+text
+User Impact:
+- Can't select images
+Solution:
+When picker returns null:
+┌─────────────────────────────────────┐
+│ Permission Required │
+│ │
+│ This app needs storage access │
+│ to select wallpaper images. │
+│ │
+│ [Open Settings] │
+│ [Cancel] │
+└─────────────────────────────────────┘
+[Open Settings] → Launch app settings screen
+2. Wallpaper Permission Denied
+text
+User Impact:
+- Can't set as live wallpaper
+Solution:
+- Not a runtime permission, so educate user:
+"To use live wallpapers, select this app
+from the system wallpaper picker:
+Settings → Wallpaper → Live Wallpapers
+→ Depth Wallpaper"
+[Copy Instructions] [OK]
+D. Network Errors (Future: Cloud Features)
+text
+For cloud sync/stock images:
+- Retry with exponential backoff
+- Show offline mode toggle
+- Cache failed requests for later
+ SUB-MODULE 11.7: Advanced UI Polish
+What You're Building:
+Professional touches that elevate user experience
+Polish Elements:
+A. Haptic Feedback
+text
+When to vibrate:
+- Slider reaches min/max value (light impact)
+- Color selected (selection click)
+- Delete confirmed (medium impact)
+- Wallpaper applied successfully (success notification)
+Implementation:
+Use HapticFeedback class in Flutter
+- HapticFeedback.lightImpact()
+- HapticFeedback.mediumImpact()
+- HapticFeedback.selectionClick()
+B. Contextual Tooltips
+text
+Show on first interaction:
+- Slider: "Drag to adjust"
+- Color picker: "Tap to select color"
+- Preview: "Pinch to zoom"
+Auto-dismiss after 2 seconds
+Store shown state to avoid repeats
+C. Snackbar Notifications
+text
+Success messages:
+ "Wallpaper created successfully"
+ "Project saved"
+ "Settings updated"
+Error messages:
+ "Failed to load image"
+ "Processing interrupted"
+Info messages:
+ℹ "This may take a moment..."
+ℹ "3 projects remaining (free limit)"
+D. Loading Skeletons
+text
+Instead of spinners, show content placeholders:
+Home screen loading:
+┌────┬────┬────┐
+│████│████│████│ ← Gray pulsing boxes
+│░░░░│░░░░│░░░░│
+└────┴────┴────┘
+Studio loading:
+[Large gray rectangle] ← Preview placeholder
+[Gray bars] ← Control placeholders
+E. Empty States
+text
+Every list needs an empty state:
+No projects:
+ [Icon] "No wallpapers yet"
+ [Button] "Create your first"
+No search results:
+ [Icon] "No matches found"
+ [Text] "Try different keywords"
+No internet (future):
+ [Icon] "You're offline"
+ [Text] "Some features unavailable"
+F. Confirmation Dialogs
+text
+Before destructive actions:
+Delete project:
+"Delete 'Sunset Wallpaper'?
+This cannot be undone."
+[Cancel] [Delete]
+Clear cache:
+"This will remove 124 MB of cached data."
+[Cancel] [Clear]
+Reset settings:
+"All customizations will be lost."
+[Cancel] [Reset]
+ SUB-MODULE 11.8: Testing & Quality Assurance
+What You're Testing:
+A. Unit Tests
+text
+Test models:
+- WallpaperConfig serialization/deserialization
+- Project ID generation uniqueness
+- File path validation
+Test services:
+- FileManager creates directories correctly
+- Database CRUD operations work
+- Config calculations (percentage to pixels)
+Example test:
+"WallpaperConfig should serialize to JSON correctly"
+"Database should retrieve projects in correct order"
+"File deletion should also remove thumbnails"
+B. Widget Tests
+text
+Test UI components:
+- Slider updates preview in real-time
+- Color picker changes font color
+- Tab switching preserves state
+- Delete dialog appears on long-press
+Example test:
+"Tapping color should update preview"
+"Slider drag should trigger onChanged callback"
+C. Integration Tests
+text
+Test full user flows:
+1. Upload image → ML Kit → Preview
+2. Customize → Apply → Wallpaper appears
+3. Save project → Exit → Reload → Project exists
+4. Delete project → Confirm → Project removed
+Example test:
+"Complete wallpaper creation flow succeeds"
+"Edited project saves changes correctly"
+D. Platform Tests (Kotlin)
+text
+Test wallpaper service:
+- Renders without crashing
+- Updates time correctly
+- Handles missing files gracefully
+- Memory doesn't leak over time
+Use Android Instrumentation tests
+E. Performance Tests
+text
+Measure:
+- App startup time (< 2 seconds)
+- Image processing time (< 5 seconds for 12MP)
+- Database query time (< 100ms for 50 projects)
+- Preview rendering FPS (> 30fps)
+Tools:
+- Flutter DevTools
+- Android Profiler
+- Firebase Performance Monitoring
+F. Device Compatibility Testing
+text
+Test on:
+- Low-end device (2GB RAM, Android 8)
+- Mid-range (4GB RAM, Android 11)
+- High-end (8GB+ RAM, Android 14)
+- Tablet (different aspect ratio)
+- Foldable (if possible)
+Edge cases:
+- Notch/punch-hole screens
+- Different screen densities (hdpi to xxxhdpi)
+- Various Android versions (API 26-34)

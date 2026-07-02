@@ -26,6 +26,8 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
   late WallpaperConfig _wallpaperConfig;
   bool _isLoading = false;
   String _loadingText = 'Loading image...';
+  
+  static const MethodChannel _platform = MethodChannel('com.yourcompany.depthwallpaper/wallpaper');
 
   final List<String> _tabs = [
     'Basics',
@@ -307,6 +309,64 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
     }
   }
 
+  Future<void> _applyWallpaper() async {
+    if (_wallpaperData.originalImagePath == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _loadingText = 'Applying wallpaper...';
+    });
+
+    try {
+      await _platform.invokeMethod('saveConfig', {
+        'fontSize': _wallpaperConfig.fontSize,
+        'horizontalPos': _wallpaperConfig.horizontalPos,
+        'verticalPos': _wallpaperConfig.verticalPos,
+        'fontColor': _wallpaperConfig.fontColor.toARGB32(),
+        'clockFormat': _wallpaperConfig.clockFormat,
+        'fontFamily': _wallpaperConfig.fontFamily,
+        'letterSpacing': _wallpaperConfig.letterSpacing,
+        'textOpacity': _wallpaperConfig.textOpacity,
+        'shadowEnabled': _wallpaperConfig.shadowEnabled,
+        'strokeEnabled': _wallpaperConfig.strokeEnabled,
+        'edgeStrokeEnabled': _wallpaperConfig.edgeStrokeEnabled,
+        'atmosphericDepthEnabled': _wallpaperConfig.atmosphericDepthEnabled,
+        'rotation': _wallpaperConfig.rotation,
+        'stretch': _wallpaperConfig.stretch,
+        'horizontalSkew': _wallpaperConfig.horizontalSkew,
+        'verticalSkew': _wallpaperConfig.verticalSkew,
+        'bottomSkewH': _wallpaperConfig.bottomSkewH,
+        'leftSkew': _wallpaperConfig.leftSkew,
+        'backgroundPath': _wallpaperData.originalImagePath,
+        'foregroundPath': _wallpaperData.foregroundImagePath,
+      });
+
+      await _platform.invokeMethod('setWallpaper');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Wallpaper config saved! Select "Depth Wallpaper" in the system picker.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to apply wallpaper: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final originalImagePath = _wallpaperData.originalImagePath;
@@ -324,6 +384,11 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Reset Settings',
             onPressed: _isLoading ? null : _resetSettings,
+          ),
+          IconButton(
+            icon: const Icon(Icons.check_rounded),
+            tooltip: 'Apply Wallpaper',
+            onPressed: _isLoading || originalImagePath == null ? null : _applyWallpaper,
           ),
         ],
       ),
