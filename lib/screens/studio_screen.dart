@@ -429,8 +429,8 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                 children: [
                   _buildBasicsTab(),
                   _buildTypographyTab(),
-                  _buildPlaceholderTab('Effects'),
-                  _buildPlaceholderTab('Transform'),
+                  _buildEffectsTab(),
+                  _buildTransformTab(),
                   _buildPlaceholderTab('Date'),
                 ],
               ),
@@ -776,6 +776,305 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildEffectsTab() {
+    final bool isEnabled = _wallpaperData.originalImagePath != null;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          _buildSliderRow(
+            label: 'Text Opacity',
+            valueText: '${(_wallpaperConfig.textOpacity * 100).toInt()}%',
+            value: _wallpaperConfig.textOpacity,
+            min: 0.0,
+            max: 1.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentPercent = (val * 100).toInt();
+              final int previousPercent = (_wallpaperConfig.textOpacity * 100).toInt();
+              if (currentPercent != previousPercent) {
+                HapticFeedback.selectionClick();
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(textOpacity: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(textOpacity: 1.0);
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildToggleRow(
+            label: 'Enable Edge Stroke',
+            subtitle: 'Adds outline to text for better visibility',
+            value: _wallpaperConfig.edgeStrokeEnabled,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              HapticFeedback.selectionClick();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(edgeStrokeEnabled: val);
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildToggleRow(
+            label: 'Enable Shadow',
+            subtitle: 'Applies drop shadow behind clock',
+            value: _wallpaperConfig.shadowEnabled,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              HapticFeedback.selectionClick();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(shadowEnabled: val);
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildToggleRow(
+            label: 'Enable Stroke',
+            subtitle: 'Different from edge stroke - filled outline effect',
+            value: _wallpaperConfig.strokeEnabled,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              HapticFeedback.selectionClick();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(strokeEnabled: val);
+              });
+            },
+          ),
+          if (!isEnabled) ...[
+            const SizedBox(height: 32),
+            Center(
+              child: Text(
+                'Please select an image to unlock controls',
+                style: TextStyle(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransformTab() {
+    final bool isEnabled = _wallpaperData.originalImagePath != null;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          _buildSliderRow(
+            label: 'Rotation',
+            valueText: '${_wallpaperConfig.rotation.toInt()}°',
+            value: _wallpaperConfig.rotation,
+            min: -180.0,
+            max: 180.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentVal = val.toInt();
+              final int previousVal = _wallpaperConfig.rotation.toInt();
+              if (currentVal != previousVal) {
+                HapticFeedback.selectionClick();
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(rotation: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(rotation: 0.0);
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSliderRow(
+            label: 'Stretch',
+            valueText: _wallpaperConfig.stretch.toStringAsFixed(2),
+            value: _wallpaperConfig.stretch,
+            min: 0.5,
+            max: 2.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentVal = (val * 100).toInt();
+              final int previousVal = (_wallpaperConfig.stretch * 100).toInt();
+              if (currentVal != previousVal) {
+                HapticFeedback.selectionClick();
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(stretch: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(stretch: 1.0);
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSliderRow(
+            label: 'Horizontal Skew',
+            valueText: _wallpaperConfig.horizontalSkew.toStringAsFixed(2),
+            value: _wallpaperConfig.horizontalSkew,
+            min: -1.0,
+            max: 1.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentVal = (val * 100).toInt();
+              final int previousVal = (_wallpaperConfig.horizontalSkew * 100).toInt();
+              if (currentVal != previousVal) {
+                HapticFeedback.selectionClick();
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(horizontalSkew: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(horizontalSkew: 0.0);
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSliderRow(
+            label: 'Vertical Skew',
+            valueText: _wallpaperConfig.verticalSkew.toStringAsFixed(2),
+            value: _wallpaperConfig.verticalSkew,
+            min: -1.0,
+            max: 1.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentVal = (val * 100).toInt();
+              final int previousVal = (_wallpaperConfig.verticalSkew * 100).toInt();
+              if (currentVal != previousVal) {
+                HapticFeedback.selectionClick();
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(verticalSkew: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(verticalSkew: 0.0);
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSliderRow(
+            label: 'Bottom Skew H',
+            valueText: _wallpaperConfig.bottomSkewH.toStringAsFixed(2),
+            value: _wallpaperConfig.bottomSkewH,
+            min: -1.0,
+            max: 1.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentVal = (val * 100).toInt();
+              final int previousVal = (_wallpaperConfig.bottomSkewH * 100).toInt();
+              if (currentVal != previousVal) {
+                HapticFeedback.selectionClick();
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(bottomSkewH: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(bottomSkewH: 0.0);
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSliderRow(
+            label: 'Left Skew',
+            valueText: _wallpaperConfig.leftSkew.toStringAsFixed(2),
+            value: _wallpaperConfig.leftSkew,
+            min: -1.0,
+            max: 1.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentVal = (val * 100).toInt();
+              final int previousVal = (_wallpaperConfig.leftSkew * 100).toInt();
+              if (currentVal != previousVal) {
+                HapticFeedback.selectionClick();
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(leftSkew: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(leftSkew: 0.0);
+              });
+            },
+          ),
+          if (!isEnabled) ...[
+            const SizedBox(height: 32),
+            Center(
+              child: Text(
+                'Please select an image to unlock controls',
+                style: TextStyle(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleRow({
+    required String label,
+    required String subtitle,
+    required bool value,
+    required bool isEnabled,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return SwitchListTile(
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isEnabled ? Colors.white : Colors.grey,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          color: isEnabled ? const Color(0xFFB0B0B0) : Colors.grey.shade600,
+          fontSize: 11,
+        ),
+      ),
+      value: value,
+      onChanged: isEnabled ? onChanged : null,
+      activeThumbColor: const Color(0xFFFFD700),
+      activeTrackColor: const Color(0xFFFFD700).withValues(alpha: 0.4),
+      inactiveThumbColor: Colors.grey.shade400,
+      inactiveTrackColor: const Color(0xFF2C2C2C),
+      contentPadding: EdgeInsets.zero,
     );
   }
 

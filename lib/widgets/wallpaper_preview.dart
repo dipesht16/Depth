@@ -65,6 +65,64 @@ class WallpaperPreview extends StatelessWidget {
           }
         }
 
+        // Build combined Matrix4 for transformations
+        final Matrix4 transformMatrix = Matrix4.identity();
+
+        // 1. Apply skews
+        if (config.horizontalSkew != 0.0) {
+          transformMatrix.setEntry(0, 1, config.horizontalSkew);
+        }
+        if (config.verticalSkew != 0.0) {
+          transformMatrix.setEntry(1, 0, config.verticalSkew);
+        }
+        if (config.bottomSkewH != 0.0) {
+          transformMatrix.setEntry(0, 1, transformMatrix.entry(0, 1) + config.bottomSkewH * 0.5);
+        }
+        if (config.leftSkew != 0.0) {
+          transformMatrix.setEntry(1, 0, transformMatrix.entry(1, 0) + config.leftSkew * 0.5);
+        }
+
+        // 2. Apply stretch (Y-scaling)
+        if (config.stretch != 1.0) {
+          transformMatrix.setEntry(1, 1, config.stretch);
+        }
+
+        // 3. Apply rotation
+        if (config.rotation != 0.0) {
+          final double radians = config.rotation * 3.141592653589793 / 180.0;
+          transformMatrix.rotateZ(radians);
+        }
+
+        // Clock layers list to compile stroke and fill
+        final List<Widget> clockLayers = [];
+
+        // 1. Draw outline/stroke layer if enabled
+        if (config.edgeStrokeEnabled || config.strokeEnabled) {
+          final double strokeWidth = (config.strokeEnabled ? 6.0 : 0.0) + (config.edgeStrokeEnabled ? 2.0 : 0.0);
+          clockLayers.add(
+            Text(
+              '12:30', // Static time for Module 4 preview validation
+              textAlign: TextAlign.center,
+              style: clockStyle.copyWith(
+                color: null, // Clear color to let foreground paint take effect
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = strokeWidth
+                  ..color = Colors.black87,
+              ),
+            ),
+          );
+        }
+
+        // 2. Draw fill layer (the main text)
+        clockLayers.add(
+          Text(
+            '12:30', // Static time for Module 4 preview validation
+            textAlign: TextAlign.center,
+            style: clockStyle,
+          ),
+        );
+
         // Positioned Clock Widget (Layer 2)
         // Positioned horizontally centered by default, shifted by config.horizontalPos slide offset
         final Widget clockWidget = Positioned(
@@ -77,10 +135,13 @@ class WallpaperPreview extends StatelessWidget {
             child: Center(
               child: Opacity(
                 opacity: config.textOpacity,
-                child: Text(
-                  '12:30', // Static time for Module 4 preview validation
-                  textAlign: TextAlign.center,
-                  style: clockStyle,
+                child: Transform(
+                  transform: transformMatrix,
+                  alignment: Alignment.center,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: clockLayers,
+                  ),
                 ),
               ),
             ),
