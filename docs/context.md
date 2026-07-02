@@ -14,8 +14,8 @@
 ---
 
 ## Current Status
-- **Phase**: Native Wallpaper Service Integration
-- **Active Module**: None (Module 8 Completed, ready for Module 9)
+- **Phase**: Live Time Updates (Kotlin)
+- **Active Module**: None (Module 9 Completed, ready for Module 10)
 
 ---
 
@@ -82,6 +82,14 @@
   - [x] Built WallpaperConfig parser and OOM-safe downsampling BitmapLoader.
   - [x] Developed native Kotlin DepthWallpaperService canvas rendering pipeline.
   - [x] Added Apply checkmark action in Flutter StudioScreen.
+
+- [x] **Module 9**: Live Time Updates
+  - [x] Refactored `updateRunnable` to use self-rescheduling `object : Runnable` pattern with debug logging.
+  - [x] Implemented `scheduleNextUpdate()` with minute-boundary synchronization (calculates offset to next whole minute).
+  - [x] Implemented `getUpdateInterval()` to switch to 1-second updates when `HH:MM:SS` format is selected.
+  - [x] Enhanced `onVisibilityChanged()` for immediate draw on screen wake and battery-safe update stopping on hide.
+  - [x] Enhanced `onSurfaceChanged()` to trigger update loop once the surface is ready.
+  - [x] Hardened `onDestroy()` comment to clarify critical handler cleanup prevents memory leaks.
 
 ---
 
@@ -202,5 +210,14 @@
   - Static Analysis (`flutter analyze`): **No issues found** (resolved color value deprecation).
   - Widget Testing (`flutter test`): **All tests passed**.
 
-
-
+### Module 9 Walkthrough: Live Time Updates
+- **Changes Implemented**:
+  - **Self-Rescheduling Runnable**: Converted `updateRunnable` to `object : Runnable` in [DepthWallpaperService.kt](file:///d:/Flutter/Wallpaper/android/app/src/main/kotlin/com/yourcompany/depthwallpaper/DepthWallpaperService.kt) so it logs the current time and calls `scheduleNextUpdate()` after each draw instead of being a fixed-delay repeat.
+  - **Minute Boundary Sync**: Implemented `scheduleNextUpdate()` using `Calendar.getInstance()` to calculate exact milliseconds until the next `:00` second tick, preventing clock drift. Clamps to 60000ms minimum for safety.
+  - **Seconds Format Support**: Implemented `getUpdateInterval()` to detect `"SS"` in the clock format string and return `1000L` for per-second updates, otherwise returns `60000L`.
+  - **Immediate Wake Draw**: Enhanced `onVisibilityChanged(visible = true)` to call `drawWallpaper()` immediately before scheduling the next update — so screen wake always shows current time instantly.
+  - **Battery Safety**: Enhanced `onVisibilityChanged(visible = false)` to call `handler.removeCallbacks(updateRunnable)` — stopping all CPU wakeups when the screen is off.
+  - **Surface Ready Loop Start**: Updated `onSurfaceChanged()` to kick off the update loop with `scheduleNextUpdate()` once surface dimensions are known.
+- **Verification Results**:
+  - Static Analysis (`flutter analyze`): **No issues found**.
+  - Widget Testing (`flutter test`): **All tests passed**.

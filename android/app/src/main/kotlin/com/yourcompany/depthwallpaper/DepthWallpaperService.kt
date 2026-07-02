@@ -15,6 +15,7 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -37,8 +38,14 @@ class DepthWallpaperService : WallpaperService() {
         private var isVisible = false
 
         private val handler = Handler(Looper.getMainLooper())
-        private val updateRunnable = Runnable {
-            drawWallpaper()
+        private val updateRunnable = object : Runnable {
+            override fun run() {
+                Log.d(TAG, "Updating time: ${getCurrentTime()}")
+                drawWallpaper()
+                if (isVisible) {
+                    scheduleNextUpdate()
+                }
+            }
         }
 
         override fun onCreate(surfaceHolder: SurfaceHolder?) {
@@ -52,6 +59,7 @@ class DepthWallpaperService : WallpaperService() {
             super.onDestroy()
             val prefs = getSharedPreferences("wallpaper_config", Context.MODE_PRIVATE)
             prefs.unregisterOnSharedPreferenceChangeListener(this)
+            // Critical: remove all pending callbacks to prevent memory leaks
             handler.removeCallbacks(updateRunnable)
             recycleBitmaps()
         }
@@ -60,8 +68,13 @@ class DepthWallpaperService : WallpaperService() {
             this.isVisible = visible
             if (visible) {
                 loadConfigAndBitmaps()
+                // Draw immediately so user sees current time on screen wake
                 drawWallpaper()
+                // Remove any stale pending callbacks before scheduling fresh one
+                handler.removeCallbacks(updateRunnable)
+                scheduleNextUpdate()
             } else {
+                // Screen off / wallpaper hidden — stop all updates to conserve battery
                 handler.removeCallbacks(updateRunnable)
             }
         }
@@ -76,6 +89,11 @@ class DepthWallpaperService : WallpaperService() {
             this.canvasHeight = height
             loadConfigAndBitmaps()
             drawWallpaper()
+            // Kick off update loop once the surface is ready
+            if (isVisible) {
+                handler.removeCallbacks(updateRunnable)
+                scheduleNextUpdate()
+            }
         }
 
         override fun onSurfaceRedrawNeeded(holder: SurfaceHolder?) {
@@ -246,6 +264,42 @@ class DepthWallpaperService : WallpaperService() {
                 else -> SimpleDateFormat("HH:mm", Locale.getDefault())
             }
             return sdf.format(Date())
+        }
+
+        /**
+         * Schedules the next time update, syncing to the nearest minute boundary
+         * when the clock format does not include seconds. This prevents drift and
+         * ensures the clock flips at exactly :00 seconds every minute.
+         */
+        private fun scheduleNextUpdate() {
+            if (!isVisible) return
+            val intervalMs = getUpdateInterval()
+            if (intervalMs == 1000L) {
+                // Seconds visible — just re-fire every second without fancy sync
+                handler.postDelayed(updateRunnable, 1000L)
+            } else {
+                // Sync precisely to the next minute boundary
+                val now = Calendar.getInstance()
+                val seconds = now.get(Calendar.SECOND)
+                val milliseconds = now.get(Calendar.MILLISECOND)
+                val delayToNextMinute = ((60 - seconds) * 1000 - milliseconds).toLong()
+                // Clamp to at least 100ms to avoid hammering when exactly on boundary
+                val safeDelay = if (delayToNextMinute < 100L) 60000L else delayToNextMinute
+                Log.d(TAG, "Next update in ${safeDelay}ms (at next minute boundary)")
+                handler.postDelayed(updateRunnable, safeDelay)
+            }
+        }
+
+        /**
+         * Returns the appropriate update interval based on whether the clock
+         * format includes seconds display.
+         */
+        private fun getUpdateInterval(): Long {
+            return if (::config.isInitialized && config.clockFormat.contains("SS")) {
+                1000L  // Update every second for HH:MM:SS formats
+            } else {
+                60000L // Update every minute for all other formats
+            }
         }
     }
 }
