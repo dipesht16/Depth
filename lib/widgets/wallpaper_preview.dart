@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/wallpaper_data.dart';
 import '../models/wallpaper_config.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class WallpaperPreview extends StatelessWidget {
   final WallpaperData data;
@@ -32,6 +33,38 @@ class WallpaperPreview extends StatelessWidget {
         final double clockY = config.verticalPos * height;
         final double clockFontSize = config.fontSize * width;
 
+        // Base text style configuration
+        final TextStyle baseClockStyle = TextStyle(
+          fontSize: clockFontSize,
+          fontWeight: FontWeight.bold,
+          color: config.fontColor,
+          letterSpacing: config.letterSpacing * clockFontSize,
+          shadows: config.shadowEnabled
+              ? [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    offset: const Offset(0, 4),
+                    blurRadius: 8,
+                  ),
+                ]
+              : null,
+        );
+
+        // Apply Google Fonts dynamically if not system default Roboto
+        TextStyle clockStyle;
+        if (config.fontFamily == 'Roboto') {
+          clockStyle = baseClockStyle.copyWith(fontFamily: 'Roboto');
+        } else {
+          try {
+            clockStyle = GoogleFonts.getFont(
+              config.fontFamily,
+              textStyle: baseClockStyle,
+            );
+          } catch (e) {
+            clockStyle = baseClockStyle.copyWith(fontFamily: config.fontFamily);
+          }
+        }
+
         // Positioned Clock Widget (Layer 2)
         // Positioned horizontally centered by default, shifted by config.horizontalPos slide offset
         final Widget clockWidget = Positioned(
@@ -47,22 +80,7 @@ class WallpaperPreview extends StatelessWidget {
                 child: Text(
                   '12:30', // Static time for Module 4 preview validation
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: clockFontSize,
-                    fontWeight: FontWeight.bold,
-                    color: config.fontColor,
-                    fontFamily: config.fontFamily,
-                    letterSpacing: config.letterSpacing * clockFontSize,
-                    shadows: config.shadowEnabled
-                        ? [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              offset: const Offset(0, 4),
-                              blurRadius: 8,
-                            ),
-                          ]
-                        : null,
-                  ),
+                  style: clockStyle,
                 ),
               ),
             ),

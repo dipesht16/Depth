@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../models/wallpaper_data.dart';
 import '../models/wallpaper_config.dart';
@@ -427,7 +428,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                 controller: _tabController,
                 children: [
                   _buildBasicsTab(),
-                  _buildPlaceholderTab('Typography'),
+                  _buildTypographyTab(),
                   _buildPlaceholderTab('Effects'),
                   _buildPlaceholderTab('Transform'),
                   _buildPlaceholderTab('Date'),
@@ -538,6 +539,243 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildTypographyTab() {
+    final bool isEnabled = _wallpaperData.originalImagePath != null;
+
+    final List<String> fonts = [
+      'Roboto',
+      'Outfit',
+      'Inter',
+      'Lilita One',
+      'Rubik',
+    ];
+
+    final List<Map<String, dynamic>> colorSwatches = [
+      {'name': 'Pure White', 'color': Colors.white},
+      {'name': 'Cream', 'color': const Color(0xFFFFFDD0)},
+      {'name': 'Warm Amber', 'color': const Color(0xFFFFB300)},
+      {'name': 'Pastel Mint', 'color': const Color(0xFFA8E6CF)},
+      {'name': 'Soft Sky Blue', 'color': const Color(0xFF95D8EB)},
+      {'name': 'Rose Pink', 'color': const Color(0xFFFFB7B2)},
+      {'name': 'Lavender', 'color': const Color(0xFFE8D7FF)},
+      {'name': 'Highlight Yellow', 'color': const Color(0xFFFFF176)},
+    ];
+
+    TextStyle textStyleForFont(String fontName) {
+      final base = const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600);
+      if (fontName == 'Roboto') {
+        return base.copyWith(fontFamily: 'Roboto');
+      } else {
+        try {
+          return GoogleFonts.getFont(fontName, textStyle: base);
+        } catch (e) {
+          return base.copyWith(fontFamily: fontName);
+        }
+      }
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          _buildSectionHeader(
+            title: 'Font Family',
+            isEnabled: isEnabled,
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(fontFamily: 'Roboto');
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 70,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: fonts.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final String font = fonts[index];
+                final bool isSelected = _wallpaperConfig.fontFamily == font;
+
+                return GestureDetector(
+                  onTap: isEnabled
+                      ? () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _wallpaperConfig = _wallpaperConfig.copyWith(fontFamily: font);
+                          });
+                        }
+                      : null,
+                  child: Opacity(
+                    opacity: isEnabled ? 1.0 : 0.5,
+                    child: Container(
+                      width: 100,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF1E1E1E)
+                            : const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFFFFD700)
+                              : const Color(0xFF2C2C2C),
+                          width: isSelected ? 2 : 1,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFFFFD700).withValues(alpha: 0.25),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                )
+                              ]
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          font,
+                          style: textStyleForFont(font).copyWith(
+                            color: isSelected ? const Color(0xFFFFD700) : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 28),
+          _buildSectionHeader(
+            title: 'Font Color',
+            isEnabled: isEnabled,
+            onReset: () {
+              HapticFeedback.mediumImpact();
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(fontColor: Colors.white);
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: colorSwatches.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final Color swatchColor = colorSwatches[index]['color'] as Color;
+                final String colorName = colorSwatches[index]['name'] as String;
+                final bool isSelected = _wallpaperConfig.fontColor.toARGB32() == swatchColor.toARGB32();
+
+                return GestureDetector(
+                  onTap: isEnabled
+                      ? () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _wallpaperConfig = _wallpaperConfig.copyWith(fontColor: swatchColor);
+                          });
+                        }
+                      : null,
+                  child: Opacity(
+                    opacity: isEnabled ? 1.0 : 0.5,
+                    child: Tooltip(
+                      message: colorName,
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFFFFD700)
+                                : Colors.white.withValues(alpha: 0.15),
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: swatchColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  size: 18,
+                                  color: Colors.black87,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (!isEnabled) ...[
+            const SizedBox(height: 32),
+            Center(
+              child: Text(
+                'Please select an image to unlock controls',
+                style: TextStyle(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required String title,
+    required bool isEnabled,
+    required VoidCallback onReset,
+  }) {
+    final Color titleColor = isEnabled ? Colors.white : Colors.grey;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: titleColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (isEnabled)
+          GestureDetector(
+            onTap: onReset,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.restore_rounded,
+                size: 13,
+                color: Color(0xFFFFD700),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
