@@ -1,4 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../models/wallpaper_data.dart';
+import '../services/file_manager.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/slide_page_route.dart';
 import 'preview_screen.dart';
@@ -12,6 +18,8 @@ class StudioScreen extends StatefulWidget {
 
 class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late WallpaperData _wallpaperData;
+  bool _isLoading = false;
 
   final List<String> _tabs = [
     'Basics',
@@ -25,6 +33,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _wallpaperData = WallpaperData();
   }
 
   @override
@@ -33,31 +42,216 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
+  // Request storage/photos permissions depending on Android SDK version
+  Future<bool> _checkAndRequestPermissions() async {
+    // Determine permission type dynamically
+    // Android 13+ (API 33+) uses READ_MEDIA_IMAGES (mapped to Permission.photos)
+    // Android 12 and below use READ_EXTERNAL_STORAGE (mapped to Permission.storage)
+    
+    // First, check status of photos permission
+    final statusPhotos = await Permission.photos.status;
+    if (statusPhotos.isGranted) return true;
+
+    // Check status of storage permission
+    final statusStorage = await Permission.storage.status;
+    if (statusStorage.isGranted) return true;
+
+    // Request permissions
+    final Map<Permission, PermissionStatus> statuses = await [
+      Permission.photos,
+      Permission.storage,
+    ].request();
+
+    final bool isPhotosGranted = statuses[Permission.photos] == PermissionStatus.granted;
+    final bool isStorageGranted = statuses[Permission.storage] == PermissionStatus.granted;
+
+    if (isPhotosGranted || isStorageGranted) {
+      return true;
+    }
+
+    // Handle permanently denied status by showing settings dialog
+    final bool isPhotosPermanentlyDenied = statuses[Permission.photos] == PermissionStatus.permanentlyDenied;
+    final bool isStoragePermanentlyDenied = statuses[Permission.storage] == PermissionStatus.permanentlyDenied;
+
+    if (isPhotosPermanentlyDenied || isStoragePermanentlyDenied) {
+      _showPermissionDeniedDialog(true);
+    } else {
+      _showPermissionDeniedDialog(false);
+    }
+
+    return false;
+  }
+
+  // Show user-friendly explanation of why permissions are needed
+  void _showPermissionDeniedDialog(bool permanentlyDenied) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        backgroundColor: const Color(0xFF121212),
+        title: const Text(
+          'Storage Access Required',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          permanentlyDenied
+              ? 'Storage/Photos permission has been permanently denied. Please enable it in the app settings to select images from your gallery.'
+              : 'Permission is needed to select a background image from your photo gallery.',
+          style: const TextStyle(color: Color(0xFFB0B0B0)),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFFB0B0B0))),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          if (permanentlyDenied)
+            TextButton(
+              child: const Text('Open Settings', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.of(context).pop();
+                openAppSettings();
+              },
+            )
+          else
+            TextButton(
+              child: const Text('Try Again', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _pickImage();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Handle single image picking and storage copying pipeline
+  Future<void> _pickImage() async {
+    try {
+      final isGranted = await _checkAndRequestPermissions();
+      if (!isGranted) return;
+
+      final ImagePicker picker = ImagePicker();
+      final XFile? pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 100, // Load original image for maximum quality
+      );
+
+      if (pickedFile == null) {
+        // User cancelled selection - silent return
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Copy image file to app's internal documents directory
+      final savedPath = await FileManager.saveImage(pickedFile);
+
+      setState(() {
+        // Delete previous original file to avoid cluttering internal storage
+        if (_wallpaperData.originalImagePath != null) {
+          FileManager.deleteImage(_wallpaperData.originalImagePath!);
+        }
+        _wallpaperData = _wallpaperData.copyWith(originalImagePath: savedPath);
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image loaded successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not load image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Reset the current workspace settings and clear stored files
+  Future<void> _resetSettings() async {
+    if (_wallpaperData.originalImagePath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No image is currently selected.')),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF121212),
+        title: const Text('Reset Studio', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Are you sure you want to reset and clear the selected image?',
+          style: TextStyle(color: Color(0xFFB0B0B0)),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFFB0B0B0))),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          TextButton(
+            child: const Text('Reset', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Clear physical file from storage
+      if (_wallpaperData.originalImagePath != null) {
+        await FileManager.deleteImage(_wallpaperData.originalImagePath!);
+      }
+
+      setState(() {
+        _wallpaperData = _wallpaperData.clear();
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Workspace reset completed.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final originalImagePath = _wallpaperData.originalImagePath;
+
     return Scaffold(
       appBar: CustomAppBar(
         title: 'Studio',
         actions: [
           IconButton(
-            icon: const Icon(Icons.photo_library_outlined),
-            tooltip: 'Select Image',
-            onPressed: () {
-              // Action will be implemented in Module 2
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Image picker will be implemented in Module 2')),
-              );
-            },
+            icon: const Icon(Icons.photo_library_rounded),
+            tooltip: 'Select Image from Gallery',
+            onPressed: _isLoading ? null : _pickImage,
           ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Reset Settings',
-            onPressed: () {
-              // Action will be implemented in future modules
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Reset settings will be implemented in future modules')),
-              );
-            },
+            onPressed: _isLoading ? null : _resetSettings,
           ),
         ],
       ),
@@ -68,11 +262,17 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
             // Section 1: Preview Area (400dp height, phone-shaped container)
             Center(
               child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    SlidePageRoute(child: const PreviewScreen()),
-                  );
-                },
+                onTap: _isLoading
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          SlidePageRoute(
+                            child: PreviewScreen(
+                              originalImagePath: originalImagePath,
+                            ),
+                          ),
+                        );
+                      },
                 child: Container(
                   height: 400,
                   width: 400 * (9 / 19.5), // Aspect ratio constraints for phone frame
@@ -91,56 +291,102 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                       )
                     ],
                   ),
-                  child: Stack(
-                    children: [
-                      // Centered Placeholder Text and Icon
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.wallpaper_rounded,
-                              size: 48,
-                              color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22), // Fit within border
+                    child: Stack(
+                      children: [
+                        // Background image rendering if loaded
+                        if (originalImagePath != null)
+                          Positioned.fill(
+                            child: Image.file(
+                              File(originalImagePath),
+                              fit: BoxFit.cover,
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Tap to Preview',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                          )
+                        else
+                          // Centered Placeholder Text and Icon when empty
+                          Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.wallpaper_rounded,
+                                  size: 48,
+                                  color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Tap Gallery Icon',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'to select background image',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFFB0B0B0),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        // Semi-transparent indicator when loaded
+                        if (originalImagePath != null)
+                          Positioned(
+                            bottom: 12,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Tap to Preview',
+                                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'No background image selected',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
-                                fontSize: 11,
+                          ),
+                        // Loading overlay indicator
+                        if (_isLoading)
+                          Positioned.fill(
+                            child: Container(
+                              color: Colors.black.withValues(alpha: 0.7),
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Loading image...',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      // Top Right Expand Icon Indicator
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.fullscreen_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

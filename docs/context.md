@@ -13,8 +13,8 @@
 ---
 
 ## Current Status
-- **Phase**: UI Foundation & Navigation Shell
-- **Active Module**: None (Module 1 Completed, ready for Module 2)
+- **Phase**: Image Selection & Storage
+- **Active Module**: None (Module 2 Completed, ready for Module 3)
 
 ---
 
@@ -36,7 +36,13 @@
   - [x] Implemented dark theme in `app_theme.dart`.
   - [x] Scaffolds for `HomeScreen`, `StudioScreen` (with 5 tabs), and full-screen `PreviewScreen` completed.
   - [x] Reusable `CustomAppBar` and premium `SlidePageRoute` transitions added.
-- [ ] **Module 2**: Image Selection & Storage
+- [x] **Module 2**: Image Selection & Storage
+  - [x] Added `image_picker`, `path_provider`, `path`, and `permission_handler` dependencies.
+  - [x] Declared storage permissions in `AndroidManifest.xml`.
+  - [x] Created `WallpaperData` data model.
+  - [x] Implemented `FileManager` service for copying original images with unique timestamps inside app documents.
+  - [x] Integrated permissions flow and gallery picker on Studio Screen.
+  - [x] Added circular loading overlay, BoxFit.cover preview container, reset dialog, and full-screen image preview.
 - [ ] **Module 3**: ML Kit Subject Segmentation
 - [ ] **Module 4**: Static Preview Renderer
 - [ ] **Module 5**: Basic Studio Editor (Position & Size)
@@ -51,6 +57,7 @@
 - **Android Platform Constraints**:
   - Min SDK Version: API 26 (Android 8.0)
   - Orientation: Portrait Only
+  - Build Tweaks: Disabled Kotlin incremental compilation (`kotlin.incremental=false` in [gradle.properties](file:///d:/Flutter/Wallpaper/android/gradle.properties)) to prevent cross-drive relative path build issues.
 
 ---
 
@@ -67,4 +74,21 @@
 - **Verification Results**:
   - Static Analysis (`flutter analyze`): **No issues found**.
   - Widget Testing (`flutter test`): **All tests passed** (verified Home Screen initialization, AppBar title, empty state text, and FAB rendering).
+
+### Module 2 Walkthrough: Image Selection & Storage
+- **Changes Implemented**:
+  - **Dependencies Added**: Integrated `image_picker` (gallery photo selection), `path_provider` (local app storage directory), `path` (file extension extraction), and `permission_handler` (storage permissions API).
+  - **AndroidManifest Configuration**: Declared `READ_MEDIA_IMAGES` (Android 13+), `READ_EXTERNAL_STORAGE` (maxSdkVersion 32), and `WRITE_EXTERNAL_STORAGE` (maxSdkVersion 29) to request storage access cleanly on all versions.
+  - **WallpaperData Data Model**: Built [wallpaper_data.dart](file:///d:/Flutter/Wallpaper/lib/models/wallpaper_data.dart) to encapsulate original, background, and foreground image paths, with `copyWith` and `clear` capabilities.
+  - **FileManager Storage Helper**: Built [file_manager.dart](file:///d:/Flutter/Wallpaper/lib/services/file_manager.dart) to automatically create `wallpapers/` subdirectory inside application documents, copy files using `original_[timestamp].[ext]` unique naming convention, delete old background files, and fetch size information.
+  - **Studio Workspace Integration**:
+    - Built a robust permission request wrapper in [studio_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/studio_screen.dart) handling normal and permanently denied statuses (shows Settings alert dialog).
+    - Wired image picker gallery trigger to top action button with SnackBars reporting states.
+    - Added loading overlay with circular indicator during storage copy operations.
+    - Updated simulated phone container to show loaded image inside `Image.file` using `BoxFit.cover` or show instructions placeholder.
+    - Added reset confirmation dialog that deletes files from disk.
+    - Passed file path to [preview_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/preview_screen.dart) to support full resolution wallpaper checking.
+- **Verification Results**:
+  - Static Analysis (`flutter analyze`): **No issues found** (resolved package import warning by adding `path` to pubspec).
+  - Widget Testing (`flutter test`): **All tests passed**.
 
