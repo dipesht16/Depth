@@ -1,13 +1,14 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../models/wallpaper_data.dart';
+import '../models/wallpaper_config.dart';
 import '../services/file_manager.dart';
 import '../services/segmentation_service.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/slide_page_route.dart';
+import '../widgets/wallpaper_preview.dart';
 import 'preview_screen.dart';
 
 class StudioScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class StudioScreen extends StatefulWidget {
 class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late WallpaperData _wallpaperData;
+  late WallpaperConfig _wallpaperConfig;
   bool _isLoading = false;
   String _loadingText = 'Loading image...';
 
@@ -36,6 +38,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _wallpaperData = WallpaperData();
+    _wallpaperConfig = WallpaperConfig();
   }
 
   @override
@@ -128,6 +131,14 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
 
   // Handle single image picking and storage copying pipeline
   Future<void> _pickImage() async {
+    // Retrieve the device's physical screen size synchronously before any async gaps
+    final mediaQuery = MediaQuery.of(context);
+    final double physicalWidth = mediaQuery.size.width * mediaQuery.devicePixelRatio;
+    final double physicalHeight = mediaQuery.size.height * mediaQuery.devicePixelRatio;
+
+    final double maxWidthConstraint = physicalWidth > 0 ? physicalWidth : 2048;
+    final double maxHeightConstraint = physicalHeight > 0 ? physicalHeight : 2048;
+
     try {
       final isGranted = await _checkAndRequestPermissions();
       if (!isGranted) return;
@@ -135,7 +146,9 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
       final ImagePicker picker = ImagePicker();
       final XFile? pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 100, // Load original image for maximum quality
+        maxWidth: maxWidthConstraint,  // Auto-configures resolution to fit the device's physical screen exactly
+        maxHeight: maxHeightConstraint,
+        imageQuality: 95, // High quality compression to preserve visual fidelity
       );
 
       if (pickedFile == null) {
@@ -326,134 +339,74 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                             child: PreviewScreen(
                               originalImagePath: originalImagePath,
                               foregroundImagePath: _wallpaperData.foregroundImagePath,
+                              wallpaperConfig: _wallpaperConfig,
                             ),
                           ),
                         );
                       },
-                child: Container(
+                child: SizedBox(
                   height: 400,
-                  width: 400 * (9 / 19.5), // Aspect ratio constraints for phone frame
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF121212),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: const Color(0xFF424242),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      )
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(22), // Fit within border
-                    child: Stack(
-                      children: [
-                        // Background image rendering if loaded
-                        if (originalImagePath != null)
-                          Positioned.fill(
-                            child: Image.file(
-                              File(originalImagePath),
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        else
-                          // Centered Placeholder Text and Icon when empty
-                          Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.wallpaper_rounded,
-                                  size: 48,
-                                  color: const Color(0xFFFFD700).withValues(alpha: 0.6),
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Tap Gallery Icon',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'to select background image',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Color(0xFFB0B0B0),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        // Foreground isolated subject rendering if loaded
-                        if (_wallpaperData.foregroundImagePath != null)
-                          Positioned.fill(
-                            child: Image.file(
-                              File(_wallpaperData.foregroundImagePath!),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-
-                        // Semi-transparent indicator when loaded
-                        if (originalImagePath != null)
-                          Positioned(
-                            bottom: 12,
-                            left: 0,
-                            right: 0,
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.6),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Tap to Preview',
-                                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        // Loading overlay indicator with dynamic text
-                        if (_isLoading)
-                          Positioned.fill(
+                  child: Stack(
+                    children: [
+                      WallpaperPreview(
+                        data: _wallpaperData,
+                        config: _wallpaperConfig,
+                        showFrame: true,
+                      ),
+                      // Semi-transparent indicator when loaded
+                      if (originalImagePath != null)
+                        Positioned(
+                          bottom: 12,
+                          left: 0,
+                          right: 0,
+                          child: Center(
                             child: Container(
-                              color: Colors.black.withValues(alpha: 0.7),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
-                                  ),
-                                  const SizedBox(height: 16),
+                                  Icon(Icons.fullscreen_rounded, size: 14, color: Colors.white),
+                                  SizedBox(width: 4),
                                   Text(
-                                    _loadingText,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    'Tap to Preview',
+                                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                      // Loading overlay indicator with dynamic text
+                      if (_isLoading)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(24), // Match border radius of WallpaperPreview
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _loadingText,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),

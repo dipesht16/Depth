@@ -14,8 +14,8 @@
 ---
 
 ## Current Status
-- **Phase**: ML Kit Subject Segmentation
-- **Active Module**: None (Module 3 Completed, ready for Module 4)
+- **Phase**: Static Preview Renderer
+- **Active Module**: None (Module 4 Completed, ready for Module 5)
 
 ---
 
@@ -51,7 +51,11 @@
   - [x] Integrated transparent PNG saving in `FileManager`.
   - [x] Updated Studio Screen to run ML segmentation asynchronously on image selection.
   - [x] Designed double-layer stack rendering (background + transparent cutout subject overlay) in simulated phone preview and full resolution Preview Screen.
-- [ ] **Module 4**: Static Preview Renderer
+- [x] **Module 4**: Static Preview Renderer
+  - [x] Created `WallpaperConfig` model for customizing styling settings (font size, position, alignment, font family).
+  - [x] Developed reusable `WallpaperPreview` widget maintaining `9/19.5` aspect ratio.
+  - [x] Structured three-layer composition logic (Background Image -> Positioned Clock -> Foreground transparent subject cutout PNG).
+  - [x] Integrated `WallpaperPreview` inside Studio Workspace screen and borderless inside `PreviewScreen`.
 - [ ] **Module 5**: Basic Studio Editor (Position & Size)
 - [ ] **Module 6**: Typography Customization
 - [ ] **Module 7**: Effects & Transform
@@ -114,4 +118,20 @@
 - **Verification Results**:
   - Static Analysis (`flutter analyze`): **No issues found** (resolved type and import issues in file manager).
   - Widget Testing (`flutter test`): **All tests passed**.
+
+### Module 4 Walkthrough: Static Preview Renderer
+- **Changes Implemented**:
+  - **WallpaperConfig Model**: Designed [wallpaper_config.dart](file:///d:/Flutter/Wallpaper/lib/models/wallpaper_config.dart) to encapsulate all customization parameters (font size, horizontal/vertical positions, color, format, and future-proof skew/effects settings).
+  - **WallpaperPreview Widget**: Implemented [wallpaper_preview.dart](file:///d:/Flutter/Wallpaper/lib/widgets/wallpaper_preview.dart) as a reusable widget which locks the aspect ratio to `9/19.5`, draws smartphone borders (if `showFrame` is enabled), and coordinates the layering stack (Background -> Positioned Clock -> Foreground transparent PNG subject).
+  - **OOM Image Crash Solution**: Solved OOM crashes on two levels:
+    1. Added dynamic screen-size constraints (retrieving the user's physical screen dimensions via `MediaQuery` inside [studio_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/studio_screen.dart)) to `ImagePicker.pickImage` to natively downscale photos to fit the device's physical screen exactly, protecting both JVM and NDK/ML Kit heap on any device automatically.
+    2. Configured dynamic `cacheWidth` decoding constraints in `Image.file` inside `WallpaperPreview` (scaled to `2 * constraints.maxWidth` to fit the viewport exactly) to prevent uncompressed decoding memory spikes in the widget layer.
+  - **Clock Position & Visibility Solution**: Resolved clipping/disappearance by centering the clock horizontally by default spanning `left: 0, right: 0` with centered alignment, and applying a sliding offset translation via `Transform.translate` mapped to `config.horizontalPos`.
+  - **Foreground 3D Uplift Drop Shadow**: Added a dynamic Gaussian-blurred dark shadow layer (`ui.ImageFilter.blur`) shifted down/right directly underneath the foreground subject, making the cutout pop out in 3D relief against the background and clock.
+  - **Studio Screen Integration**: Replaced the previous ad-hoc Stack in [studio_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/studio_screen.dart) with `WallpaperPreview`, wrapping it with full-screen navigation trigger, "Tap to Preview" overlay, and centered progress overlays.
+  - **Preview Screen Integration**: Updated [preview_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/preview_screen.dart) to render `WallpaperPreview` borderless (`showFrame: false`), ensuring edge-to-edge full screen depth composition testing.
+- **Verification Results**:
+  - Static Analysis (`flutter analyze`): **No issues found** (cleaned up unused import `dart:io` in studio screen).
+  - Widget Testing (`flutter test`): **All tests passed**.
+
 
