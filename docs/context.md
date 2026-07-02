@@ -4,6 +4,7 @@
 > **MANDATORY INSTRUCTIONS FOR THE AI AGENT:** 
 > 1. You MUST update this file after completing every module or significant implementation step. This file serves as the single source of truth for the project's current state, codebase changes, active configurations, and next steps. Do not skip this update under any circumstances.
 > 2. **CRITICAL GIT RULE**: DO NOT run git commit or git push commands or stage files automatically for GitHub until the user has explicitly tested the changes locally and given approval to push.
+> 3. **COMMIT MESSAGE RULE**: Do not use the word "Module" with its number in git commit messages (e.g. avoid "Module 1" or "Module 2"). Instead, start the commit message with "Implemented: " followed by a descriptive list of the specific features added (e.g. "Implemented: Image Selection, storage copying, permissions handling, and preview rendering").
 
 ## Project Overview
 - **Project Name**: DepthWall (`wallpaper`)
@@ -13,8 +14,8 @@
 ---
 
 ## Current Status
-- **Phase**: Image Selection & Storage
-- **Active Module**: None (Module 2 Completed, ready for Module 3)
+- **Phase**: ML Kit Subject Segmentation
+- **Active Module**: None (Module 3 Completed, ready for Module 4)
 
 ---
 
@@ -43,7 +44,13 @@
   - [x] Implemented `FileManager` service for copying original images with unique timestamps inside app documents.
   - [x] Integrated permissions flow and gallery picker on Studio Screen.
   - [x] Added circular loading overlay, BoxFit.cover preview container, reset dialog, and full-screen image preview.
-- [ ] **Module 3**: ML Kit Subject Segmentation
+- [x] **Module 3**: ML Kit Subject Segmentation
+  - [x] Added `google_mlkit_subject_segmentation` dependency.
+  - [x] Added Play Services dependencies auto-download meta-data in `AndroidManifest.xml`.
+  - [x] Implemented `SegmentationService` to extract foregroundBitmap bytes.
+  - [x] Integrated transparent PNG saving in `FileManager`.
+  - [x] Updated Studio Screen to run ML segmentation asynchronously on image selection.
+  - [x] Designed double-layer stack rendering (background + transparent cutout subject overlay) in simulated phone preview and full resolution Preview Screen.
 - [ ] **Module 4**: Static Preview Renderer
 - [ ] **Module 5**: Basic Studio Editor (Position & Size)
 - [ ] **Module 6**: Typography Customization
@@ -90,5 +97,21 @@
     - Passed file path to [preview_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/preview_screen.dart) to support full resolution wallpaper checking.
 - **Verification Results**:
   - Static Analysis (`flutter analyze`): **No issues found** (resolved package import warning by adding `path` to pubspec).
+  - Widget Testing (`flutter test`): **All tests passed**.
+
+### Module 3 Walkthrough: ML Kit Subject Segmentation
+- **Changes Implemented**:
+  - **Dependencies Integrated**: Added `google_mlkit_subject_segmentation: ^0.0.3` to `pubspec.yaml` (using the correct stable version published on pub.dev).
+  - **Model Download Configuration**: Injected `com.google.mlkit.vision.DEPENDENCIES` metadata into [AndroidManifest.xml](file:///d:/Flutter/Wallpaper/android/app/src/main/AndroidManifest.xml) to trigger automated Play Services ML model download.
+  - **Segmentation Service Creation**: Built [segmentation_service.dart](file:///d:/Flutter/Wallpaper/lib/services/segmentation_service.dart) which creates a `SubjectSegmenter` configured for extracting the combined foreground bitmap, processes input images, retrieves the `foregroundBitmap` byte array directly, saves it, and cleans resources.
+  - **FileManager PNG Capabilities**: Added `saveForegroundImage` to [file_manager.dart](file:///d:/Flutter/Wallpaper/lib/services/file_manager.dart) to write the isolated mask PNG bytes to disk.
+  - **UI Integration**:
+    - Enabled dynamic loading status indicators (*"Loading image..."* then *"Detecting subject..."*) to show active pipeline status.
+    - Stacked background image and foreground transparent PNG exactly over each other inside simulated phone frame in [studio_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/studio_screen.dart) using `BoxFit.cover`.
+    - Passed both layers to [preview_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/preview_screen.dart) to show full screen composite preview.
+    - Handled fallback gracefully: if no subject is found, show an informative AlertDialog and retain the original image as standard background (no depth overlay).
+    - Reset settings now deletes both physical files from storage.
+- **Verification Results**:
+  - Static Analysis (`flutter analyze`): **No issues found** (resolved type and import issues in file manager).
   - Widget Testing (`flutter test`): **All tests passed**.
 

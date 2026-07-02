@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -53,5 +54,22 @@ class FileManager {
       return await file.length();
     }
     return 0;
+  }
+
+  // Copy foreground subject PNG bytes to app documents directory and return new path
+  static Future<String> saveForegroundImage(Uint8List bytes) async {
+    final wallpapersDir = await getAppDirectory();
+    
+    // Generate unique file name: foreground_[timestamp].png
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final newFileName = 'foreground_$timestamp.png';
+    
+    final destinationPath = p.join(wallpapersDir.path, newFileName);
+    
+    // Write bytes to file
+    final destinationFile = File(destinationPath);
+    await destinationFile.writeAsBytes(bytes);
+    
+    return destinationFile.path;
   }
 }

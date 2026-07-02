@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 
 class PreviewScreen extends StatelessWidget {
   final String? originalImagePath;
+  final String? foregroundImagePath;
 
   const PreviewScreen({
     super.key,
     this.originalImagePath,
+    this.foregroundImagePath,
   });
 
   @override
@@ -16,15 +18,23 @@ class PreviewScreen extends StatelessWidget {
       body: SafeArea(
         child: Stack(
           children: [
-            // Full Screen Image if available, otherwise show placeholder
-            if (originalImagePath != null)
+            // Full Screen Background Image if available, otherwise show placeholder
+            if (originalImagePath != null) ...[
               Positioned.fill(
                 child: Image.file(
                   File(originalImagePath!),
                   fit: BoxFit.cover,
                 ),
-              )
-            else
+              ),
+              // Full Screen Foreground Layer if isolated
+              if (foregroundImagePath != null)
+                Positioned.fill(
+                  child: Image.file(
+                    File(foregroundImagePath!),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+            ] else
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),

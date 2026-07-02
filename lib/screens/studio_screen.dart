@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../models/wallpaper_data.dart';
 import '../services/file_manager.dart';
+import '../services/segmentation_service.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/slide_page_route.dart';
 import 'preview_screen.dart';
@@ -20,6 +21,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
   late TabController _tabController;
   late WallpaperData _wallpaperData;
   bool _isLoading = false;
+  String _loadingText = 'Loading image...';
 
   final List<String> _tabs = [
     'Basics',
@@ -143,28 +145,55 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
 
       setState(() {
         _isLoading = true;
+        _loadingText = 'Loading image...';
       });
 
       // Copy image file to app's internal documents directory
       final savedPath = await FileManager.saveImage(pickedFile);
 
       setState(() {
-        // Delete previous original file to avoid cluttering internal storage
+        _loadingText = 'Detecting subject...';
+      });
+
+      // Run ML Kit Subject Segmentation on the saved image path
+      final maskPath = await SegmentationService.segmentSubject(savedPath);
+
+      setState(() {
+        // Clean up previous files to avoid cluttering internal storage
         if (_wallpaperData.originalImagePath != null) {
           FileManager.deleteImage(_wallpaperData.originalImagePath!);
         }
-        _wallpaperData = _wallpaperData.copyWith(originalImagePath: savedPath);
+        if (_wallpaperData.foregroundImagePath != null) {
+          FileManager.deleteImage(_wallpaperData.foregroundImagePath!);
+        }
+
+        if (maskPath != null) {
+          _wallpaperData = _wallpaperData.copyWith(
+            originalImagePath: savedPath,
+            foregroundImagePath: maskPath,
+          );
+        } else {
+          // If segmentation fails, we keep the original image as background, but no foreground overlay
+          _wallpaperData = _wallpaperData.copyWith(
+            originalImagePath: savedPath,
+            foregroundImagePath: null,
+          );
+        }
         _isLoading = false;
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image loaded successfully!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        if (maskPath != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Subject isolated and loaded successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          _showNoSubjectDialog();
+        }
       }
     } catch (e) {
       setState(() {
@@ -179,6 +208,29 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
         );
       }
     }
+  }
+
+  // Show a dialog explaining that no subject could be isolated
+  void _showNoSubjectDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF121212),
+        title: const Text('No Subject Detected', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text(
+          'ML Kit could not detect a clear foreground subject in this photo. '
+          'You can still use it as a standard wallpaper, but the depth effect will not be available. '
+          'Try selecting an image with a person, animal, or prominent object.',
+          style: TextStyle(color: Color(0xFFB0B0B0)),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('OK', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
   }
 
   // Reset the current workspace settings and clear stored files
@@ -215,11 +267,15 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
     if (confirm == true) {
       setState(() {
         _isLoading = true;
+        _loadingText = 'Resetting...';
       });
 
-      // Clear physical file from storage
+      // Clear physical files from storage
       if (_wallpaperData.originalImagePath != null) {
         await FileManager.deleteImage(_wallpaperData.originalImagePath!);
+      }
+      if (_wallpaperData.foregroundImagePath != null) {
+        await FileManager.deleteImage(_wallpaperData.foregroundImagePath!);
       }
 
       setState(() {
@@ -269,6 +325,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                           SlidePageRoute(
                             child: PreviewScreen(
                               originalImagePath: originalImagePath,
+                              foregroundImagePath: _wallpaperData.foregroundImagePath,
                             ),
                           ),
                         );
@@ -335,6 +392,16 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                               ],
                             ),
                           ),
+
+                        // Foreground isolated subject rendering if loaded
+                        if (_wallpaperData.foregroundImagePath != null)
+                          Positioned.fill(
+                            child: Image.file(
+                              File(_wallpaperData.foregroundImagePath!),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+
                         // Semi-transparent indicator when loaded
                         if (originalImagePath != null)
                           Positioned(
@@ -362,21 +429,21 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                               ),
                             ),
                           ),
-                        // Loading overlay indicator
+                        // Loading overlay indicator with dynamic text
                         if (_isLoading)
                           Positioned.fill(
                             child: Container(
                               color: Colors.black.withValues(alpha: 0.7),
-                              child: const Column(
+                              child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  CircularProgressIndicator(
+                                  const CircularProgressIndicator(
                                     valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
                                   ),
-                                  SizedBox(height: 16),
+                                  const SizedBox(height: 16),
                                   Text(
-                                    'Loading image...',
-                                    style: TextStyle(
+                                    _loadingText,
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                     ),
