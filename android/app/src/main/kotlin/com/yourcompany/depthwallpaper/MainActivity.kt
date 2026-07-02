@@ -1,4 +1,4 @@
-package com.example.wallpaper
+package com.yourcompany.depthwallpaper
 
 import io.flutter.embedding.android.FlutterActivity
 
