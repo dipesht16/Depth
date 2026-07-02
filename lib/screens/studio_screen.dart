@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -293,6 +294,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
 
       setState(() {
         _wallpaperData = _wallpaperData.clear();
+        _wallpaperConfig = WallpaperConfig();
         _isLoading = false;
       });
 
@@ -423,32 +425,224 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                children: _tabs.map((tabName) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _getTabIcon(tabName),
-                          size: 40,
-                          color: const Color(0xFFFFD700).withValues(alpha: 0.4),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '$tabName Tab Placeholder',
-                          style: const TextStyle(
-                            color: Color(0xFFB0B0B0),
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                children: [
+                  _buildBasicsTab(),
+                  _buildPlaceholderTab('Typography'),
+                  _buildPlaceholderTab('Effects'),
+                  _buildPlaceholderTab('Transform'),
+                  _buildPlaceholderTab('Date'),
+                ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBasicsTab() {
+    final bool isEnabled = _wallpaperData.originalImagePath != null;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          _buildSliderRow(
+            label: 'Font Size',
+            valueText: '${(_wallpaperConfig.fontSize * 100).toInt()}%',
+            value: _wallpaperConfig.fontSize,
+            min: 0.1,
+            max: 0.5,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentPercent = (val * 100).toInt();
+              final int previousPercent = (_wallpaperConfig.fontSize * 100).toInt();
+              if (currentPercent != previousPercent) {
+                HapticFeedback.selectionClick(); // Tactile tick for every 1% change
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(fontSize: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact(); // Strong tactile click when resetting parameter
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(fontSize: 0.24);
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSliderRow(
+            label: 'Horizontal Position',
+            valueText: '${(_wallpaperConfig.horizontalPos * 100).toInt()}%',
+            value: _wallpaperConfig.horizontalPos,
+            min: 0.0,
+            max: 1.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentPercent = (val * 100).toInt();
+              final int previousPercent = (_wallpaperConfig.horizontalPos * 100).toInt();
+              if (currentPercent != previousPercent) {
+                HapticFeedback.selectionClick(); // Tactile tick for every 1% change
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(horizontalPos: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact(); // Strong tactile click when resetting parameter
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(horizontalPos: 0.48);
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSliderRow(
+            label: 'Vertical Position',
+            valueText: '${(_wallpaperConfig.verticalPos * 100).toInt()}%',
+            value: _wallpaperConfig.verticalPos,
+            min: 0.0,
+            max: 1.0,
+            isEnabled: isEnabled,
+            onChanged: (val) {
+              final int currentPercent = (val * 100).toInt();
+              final int previousPercent = (_wallpaperConfig.verticalPos * 100).toInt();
+              if (currentPercent != previousPercent) {
+                HapticFeedback.selectionClick(); // Tactile tick for every 1% change
+              }
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(verticalPos: val);
+              });
+            },
+            onReset: () {
+              HapticFeedback.mediumImpact(); // Strong tactile click when resetting parameter
+              setState(() {
+                _wallpaperConfig = _wallpaperConfig.copyWith(verticalPos: 0.24);
+              });
+            },
+          ),
+          if (!isEnabled) ...[
+            const SizedBox(height: 32),
+            Center(
+              child: Text(
+                'Please select an image to unlock controls',
+                style: TextStyle(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.6),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliderRow({
+    required String label,
+    required String valueText,
+    required double value,
+    required double min,
+    required double max,
+    required bool isEnabled,
+    required ValueChanged<double> onChanged,
+    required VoidCallback onReset,
+  }) {
+    final Color titleColor = isEnabled ? Colors.white : Colors.grey;
+    final Color valColor = isEnabled ? const Color(0xFFFFD700) : Colors.grey;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: titleColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  valueText,
+                  style: TextStyle(
+                    color: valColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (isEnabled) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: onReset,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.restore_rounded, // Premium subtle restore icon
+                        size: 13,
+                        color: Color(0xFFFFD700),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderThemeData(
+            activeTrackColor: const Color(0xFFFFD700),
+            inactiveTrackColor: const Color(0xFF2C2C2C),
+            overlayColor: const Color(0xFFFFD700).withValues(alpha: 0.12),
+            trackHeight: 6, // Thicker track for modern UI feel
+            thumbShape: const CustomSliderThumbShape(thumbRadius: 9), // Custom premium donut shape
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+            disabledActiveTrackColor: Colors.grey.shade800,
+            disabledInactiveTrackColor: Colors.grey.shade900,
+          ),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            onChanged: isEnabled ? onChanged : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlaceholderTab(String tabName) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _getTabIcon(tabName),
+            size: 40,
+            color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$tabName Tab Placeholder',
+            style: const TextStyle(
+              color: Color(0xFFB0B0B0),
+              fontSize: 15,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -468,5 +662,59 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
       default:
         return Icons.star_rounded;
     }
+  }
+}
+
+class CustomSliderThumbShape extends SliderComponentShape {
+  final double thumbRadius;
+  const CustomSliderThumbShape({this.thumbRadius = 9.0});
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) {
+    return Size.fromRadius(thumbRadius);
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
+    final Canvas canvas = context.canvas;
+    final bool isEnabled = enableAnimation.value > 0.5;
+
+    // Dynamic scale and glow factors based on activation (user press/drag)
+    final double scale = 1.0 + (activationAnimation.value * 0.3); // Grows up to 30% larger
+    final double currentRadius = thumbRadius * scale;
+
+    // 1. Draw glowing translucent outer halo when active/dragging (alive feel)
+    if (isEnabled && activationAnimation.value > 0.0) {
+      final Paint haloPaint = Paint()
+        ..color = const Color(0xFFFFD700).withValues(alpha: 0.18 * activationAnimation.value)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(center, currentRadius * 1.6, haloPaint);
+    }
+
+    // 2. Draw outer thumb border (yellow if enabled, grey if disabled)
+    final fillPaint = Paint()
+      ..color = isEnabled ? const Color(0xFFFFD700) : Colors.grey.shade600
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, currentRadius, fillPaint);
+
+    // 3. Draw inner dark center (donut shape) for premium aesthetic
+    // Inner center scales with the thumb to maintain proportions
+    final innerPaint = Paint()
+      ..color = const Color(0xFF121212)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, currentRadius * 0.45, innerPaint);
   }
 }

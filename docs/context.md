@@ -14,8 +14,8 @@
 ---
 
 ## Current Status
-- **Phase**: Static Preview Renderer
-- **Active Module**: None (Module 4 Completed, ready for Module 5)
+- **Phase**: Basic Studio Editor (Position & Size)
+- **Active Module**: None (Module 5 Completed, ready for Module 6)
 
 ---
 
@@ -56,7 +56,12 @@
   - [x] Developed reusable `WallpaperPreview` widget maintaining `9/19.5` aspect ratio.
   - [x] Structured three-layer composition logic (Background Image -> Positioned Clock -> Foreground transparent subject cutout PNG).
   - [x] Integrated `WallpaperPreview` inside Studio Workspace screen and borderless inside `PreviewScreen`.
-- [ ] **Module 5**: Basic Studio Editor (Position & Size)
+- [x] **Module 5**: Basic Studio Editor (Position & Size)
+  - [x] Replaced generic Basics Tab content with custom sliders (Font Size, Horizontal Position, Vertical Position).
+  - [x] Designed responsive Yellow active thumb/track slider styling in dark theme.
+  - [x] Connected sliders to update `WallpaperConfig` in real-time.
+  - [x] Implemented auto-disabling of editor controls when no image is selected.
+  - [x] Extended confirmation reset function to restore defaults for `WallpaperConfig`.
 - [ ] **Module 6**: Typography Customization
 - [ ] **Module 7**: Effects & Transform
 
@@ -133,5 +138,19 @@
 - **Verification Results**:
   - Static Analysis (`flutter analyze`): **No issues found** (cleaned up unused import `dart:io` in studio screen).
   - Widget Testing (`flutter test`): **All tests passed**.
+
+### Module 5 Walkthrough: Basic Studio Editor (Position & Size)
+- **Changes Implemented**:
+  - **Basics Tab Slider Panel**: Built dynamic slider controls in the "Basics" tab of [studio_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/studio_screen.dart) for adjusting Font Size (range `0.1` to `0.5`), Horizontal Position (range `0.0` to `1.0`), and Vertical Position (range `0.0` to `1.0`).
+  - **Premium Donut Dragger UI**: Designed a custom `CustomSliderThumbShape` which renders as a yellow glowing outer circle with a hollow dark center (donut style) on a thick modern track (`trackHeight: 6`).
+  - **Expanding Halo Activation Animations**: Programmed the custom thumb painter to dynamically scale the thumb radius by up to 30% and project a glowing translucent yellow halo (`withValues(alpha: ...)`) around itself when pressed/dragged using `activationAnimation.value`.
+  - **Integer-Percent Tick Haptics**: Integrated tactile feedback using `HapticFeedback.selectionClick()` on every 1% slider increment, creating a high-end dial-crown mechanical feedback sensation as the user slides the control.
+  - **Tactile Reset Buttons**: Injected restore icons (`Icons.restore_rounded`) next to percentage readouts above each slider, triggering `HapticFeedback.mediumImpact()` (strong physical click) and resetting *only* that specific configuration parameter.
+  - **Disable-State Integration**: Programmed controls to automatically render greyed-out and disabled (with `onChanged` set to null) until an image is loaded, showing an advisory label: *"Please select an image to unlock controls"*.
+  - **Workspace Reset Extension**: Updated the workspace reset routine in [studio_screen.dart](file:///d:/Flutter/Wallpaper/lib/screens/studio_screen.dart) to restore defaults for `_wallpaperConfig` alongside deleting physical files.
+- **Verification Results**:
+  - Static Analysis (`flutter analyze`): **No issues found**.
+  - Widget Testing (`flutter test`): **All tests passed**.
+
 
 
