@@ -72,4 +72,15 @@ class FileManager {
     
     return destinationFile.path;
   }
+
+  /// Save a PNG thumbnail (from RepaintBoundary capture) and return its path.
+  Future<String> saveThumbnail(Uint8List bytes) async {
+    final wallpapersDir = await FileManager.getAppDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final fileName = 'thumb_$timestamp.png';
+    final filePath = p.join(wallpapersDir.path, fileName);
+    final file = File(filePath);
+    await file.writeAsBytes(bytes);
+    return filePath;
+  }
 }

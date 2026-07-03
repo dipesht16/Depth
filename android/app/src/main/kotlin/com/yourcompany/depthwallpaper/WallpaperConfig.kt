@@ -32,7 +32,16 @@ data class WallpaperConfig(
 
     // File paths
     val backgroundPath: String? = null,
-    val foregroundPath: String? = null
+    val foregroundPath: String? = null,
+    // Date Widget
+    val showDate: Boolean = false,
+    val dateFontSize: Float = 0.034f,
+    val dateHorizontalPos: Float = 0.78f,
+    val dateVerticalPos: Float = 0.11f,
+    val dateColor: Int = -1, // white
+    val dateFormat: String = "EEE, MMM dd",
+    val dateAllCaps: Boolean = true,
+    val dateBold: Boolean = false
 ) {
     companion object {
         fun fromSharedPreferences(context: Context): WallpaperConfig {
@@ -62,7 +71,15 @@ data class WallpaperConfig(
                 leftSkew = prefs.getFloat("leftSkew", 0.0f),
 
                 backgroundPath = prefs.getString("backgroundPath", null),
-                foregroundPath = prefs.getString("foregroundPath", null)
+                foregroundPath = prefs.getString("foregroundPath", null),
+                showDate = prefs.getBoolean("showDate", false),
+                dateFontSize = prefs.getFloat("dateFontSize", 0.034f),
+                dateHorizontalPos = prefs.getFloat("dateHorizontalPos", 0.78f),
+                dateVerticalPos = prefs.getFloat("dateVerticalPos", 0.11f),
+                dateColor = prefs.getInt("dateColor", -1),
+                dateFormat = prefs.getString("dateFormat", "EEE, MMM dd") ?: "EEE, MMM dd",
+                dateAllCaps = prefs.getBoolean("dateAllCaps", true),
+                dateBold = prefs.getBoolean("dateBold", false)
             )
         }
     }

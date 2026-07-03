@@ -1,20 +1,30 @@
+import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/wallpaper_data.dart';
 import '../models/wallpaper_config.dart';
+import '../models/wallpaper_project.dart';
 import '../services/file_manager.dart';
+import '../services/project_repository.dart';
 import '../services/segmentation_service.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/slide_page_route.dart';
 import '../widgets/wallpaper_preview.dart';
+import '../widgets/date_tab.dart';
+import '../widgets/date_settings_tab.dart';
 import 'preview_screen.dart';
 
 class StudioScreen extends StatefulWidget {
-  const StudioScreen({super.key});
+  /// Pass an existing project to enter edit mode; null for new project.
+  final WallpaperProject? project;
+  const StudioScreen({super.key, this.project});
 
   @override
   State<StudioScreen> createState() => _StudioScreenState();
@@ -25,7 +35,10 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
   late WallpaperData _wallpaperData;
   late WallpaperConfig _wallpaperConfig;
   bool _isLoading = false;
+  bool _isSaving = false;
   String _loadingText = 'Loading image...';
+  final GlobalKey _previewKey = GlobalKey();
+  final _repo = ProjectRepository();
   
   static const MethodChannel _platform = MethodChannel('com.yourcompany.depthwallpaper/wallpaper');
 
@@ -35,14 +48,26 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
     'Effects',
     'Transform',
     'Date',
+    'Date Settings',
   ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
-    _wallpaperData = WallpaperData();
-    _wallpaperConfig = WallpaperConfig();
+
+    final p = widget.project;
+    if (p != null) {
+      // Edit mode: restore saved config and image paths
+      _wallpaperConfig = p.config;
+      _wallpaperData = WallpaperData(
+        originalImagePath: p.originalImagePath,
+        foregroundImagePath: p.foregroundImagePath,
+      );
+    } else {
+      _wallpaperData = WallpaperData();
+      _wallpaperConfig = WallpaperConfig();
+    }
   }
 
   @override
@@ -168,6 +193,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
       // Copy image file to app's internal documents directory
       final savedPath = await FileManager.saveImage(pickedFile);
 
+      if (!mounted) return;
       setState(() {
         _loadingText = 'Detecting subject...';
       });
@@ -175,6 +201,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
       // Run ML Kit Subject Segmentation on the saved image path
       final maskPath = await SegmentationService.segmentSubject(savedPath);
 
+      if (!mounted) return;
       setState(() {
         // Clean up previous files to avoid cluttering internal storage
         if (_wallpaperData.originalImagePath != null) {
@@ -213,9 +240,11 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
         }
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -339,6 +368,15 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
         'leftSkew': _wallpaperConfig.leftSkew,
         'backgroundPath': _wallpaperData.originalImagePath,
         'foregroundPath': _wallpaperData.foregroundImagePath,
+        // Date Widget
+        'showDate': _wallpaperConfig.showDate,
+        'dateFontSize': _wallpaperConfig.dateFontSize,
+        'dateHorizontalPos': _wallpaperConfig.dateHorizontalPos,
+        'dateVerticalPos': _wallpaperConfig.dateVerticalPos,
+        'dateColor': _wallpaperConfig.dateColor.toARGB32(),
+        'dateFormat': _wallpaperConfig.dateFormat,
+        'dateAllCaps': _wallpaperConfig.dateAllCaps,
+        'dateBold': _wallpaperConfig.dateBold,
       });
 
       await _platform.invokeMethod('setWallpaper');
@@ -361,9 +399,78 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// Capture preview thumbnail, serialize config, and upsert project to Hive.
+  Future<void> _saveProject() async {
+    setState(() => _isSaving = true);
+    try {
+      // Capture thumbnail from RepaintBoundary
+      String? thumbPath;
+      try {
+        final boundary = _previewKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+        if (boundary != null) {
+          final image = await boundary.toImage(pixelRatio: 1.5);
+          final byteData =
+              await image.toByteData(format: ui.ImageByteFormat.png);
+          if (byteData != null) {
+            thumbPath = await FileManager()
+                .saveThumbnail(byteData.buffer.asUint8List());
+          }
+        }
+      } catch (_) {
+        // Thumbnail capture failure is non-fatal
+      }
+
+      final now = DateTime.now();
+      final existing = widget.project;
+      final configJson = jsonEncode(_wallpaperConfig.toJson());
+
+      final project = WallpaperProject(
+        id: existing?.id ?? const Uuid().v4(),
+        name: existing?.name ?? 'Wallpaper ${now.day}/${now.month}',
+        createdAt: existing?.createdAt ?? now,
+        modifiedAt: now,
+        thumbnailPath: thumbPath ?? existing?.thumbnailPath,
+        isActive: existing?.isActive ?? false,
+        originalImagePath: _wallpaperData.originalImagePath,
+        foregroundImagePath: _wallpaperData.foregroundImagePath,
+        configJson: configJson,
+      );
+
+      await _repo.saveProject(project);
+
+      if (mounted) {
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✓  Project saved'),
+            backgroundColor: Color(0xFF1E3A1E),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        // Return to Home after short delay
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Save failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -373,7 +480,7 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
 
     return Scaffold(
       appBar: CustomAppBar(
-        title: 'Studio',
+        title: widget.project != null ? 'Edit Project' : 'Studio',
         actions: [
           IconButton(
             icon: const Icon(Icons.photo_library_rounded),
@@ -384,6 +491,20 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Reset Settings',
             onPressed: _isLoading ? null : _resetSettings,
+          ),
+          // Save project button
+          IconButton(
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Color(0xFFFFD700)))
+                : const Icon(Icons.save_rounded),
+            tooltip: 'Save Project',
+            onPressed: _isLoading || _isSaving || _wallpaperData.originalImagePath == null
+                ? null
+                : _saveProject,
           ),
           IconButton(
             icon: const Icon(Icons.check_rounded),
@@ -416,10 +537,13 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                   height: 400,
                   child: Stack(
                     children: [
-                      WallpaperPreview(
-                        data: _wallpaperData,
-                        config: _wallpaperConfig,
-                        showFrame: true,
+                      RepaintBoundary(
+                        key: _previewKey,
+                        child: WallpaperPreview(
+                          data: _wallpaperData,
+                          config: _wallpaperConfig,
+                          showFrame: true,
+                        ),
                       ),
                       // Semi-transparent indicator when loaded
                       if (originalImagePath != null)
@@ -496,7 +620,16 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
                   _buildTypographyTab(),
                   _buildEffectsTab(),
                   _buildTransformTab(),
-                  _buildPlaceholderTab('Date'),
+                  DateTab(
+                    config: _wallpaperConfig,
+                    onConfigChanged: (updated) => setState(() => _wallpaperConfig = updated),
+                    isEnabled: _wallpaperData.originalImagePath != null,
+                  ),
+                  DateSettingsTab(
+                    config: _wallpaperConfig,
+                    onConfigChanged: (updated) => setState(() => _wallpaperConfig = updated),
+                    isEnabled: _wallpaperData.originalImagePath != null,
+                  ),
                 ],
               ),
             ),
@@ -1224,46 +1357,6 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
         ),
       ],
     );
-  }
-
-  Widget _buildPlaceholderTab(String tabName) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            _getTabIcon(tabName),
-            size: 40,
-            color: const Color(0xFFFFD700).withValues(alpha: 0.4),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '$tabName Tab Placeholder',
-            style: const TextStyle(
-              color: Color(0xFFB0B0B0),
-              fontSize: 15,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData _getTabIcon(String tabName) {
-    switch (tabName) {
-      case 'Basics':
-        return Icons.tune_rounded;
-      case 'Typography':
-        return Icons.text_fields_rounded;
-      case 'Effects':
-        return Icons.auto_awesome_rounded;
-      case 'Transform':
-        return Icons.transform_rounded;
-      case 'Date':
-        return Icons.calendar_today_rounded;
-      default:
-        return Icons.star_rounded;
-    }
   }
 }
 

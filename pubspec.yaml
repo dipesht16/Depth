@@ -38,6 +38,11 @@ dependencies:
   permission_handler: ^11.3.1
   google_mlkit_subject_segmentation: ^0.0.3
   google_fonts: ^6.2.0
+  intl: ^0.20.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  uuid: ^4.5.1
+  shared_preferences: ^2.3.5
 
 dev_dependencies:
   flutter_test:

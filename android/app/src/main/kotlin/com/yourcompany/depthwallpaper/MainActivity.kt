@@ -74,6 +74,16 @@ class MainActivity : FlutterActivity() {
             putString("backgroundPath", config["backgroundPath"] as? String)
             putString("foregroundPath", config["foregroundPath"] as? String)
 
+            // Date Widget
+            putBoolean("showDate", config["showDate"] as? Boolean ?: false)
+            putFloat("dateFontSize", (config["dateFontSize"] as? Number)?.toFloat() ?: 0.034f)
+            putFloat("dateHorizontalPos", (config["dateHorizontalPos"] as? Number)?.toFloat() ?: 0.78f)
+            putFloat("dateVerticalPos", (config["dateVerticalPos"] as? Number)?.toFloat() ?: 0.11f)
+            putInt("dateColor", (config["dateColor"] as? Number)?.toInt() ?: -1)
+            putString("dateFormat", config["dateFormat"] as? String ?: "EEE, MMM dd")
+            putBoolean("dateAllCaps", config["dateAllCaps"] as? Boolean ?: true)
+            putBoolean("dateBold", config["dateBold"] as? Boolean ?: false)
+
             apply()
         }
     }

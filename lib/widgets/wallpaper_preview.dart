@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/wallpaper_data.dart';
 import '../models/wallpaper_config.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -232,6 +233,28 @@ class WallpaperPreview extends StatelessWidget {
                   cacheWidth: targetCacheWidth > 0 ? targetCacheWidth : null,
                 ),
               ),
+
+            // Layer 4: Date widget (always on top of foreground — HUD element)
+            if (config.showDate)
+              Positioned(
+                left: config.dateHorizontalPos * width,
+                top: config.dateVerticalPos * height,
+                child: Text(
+                  _getFormattedDate(config.dateFormat, config.dateAllCaps),
+                  style: TextStyle(
+                    fontSize: config.dateFontSize * width,
+                    color: config.dateColor,
+                    fontWeight: config.dateBold ? FontWeight.bold : FontWeight.normal,
+                    shadows: const [
+                      Shadow(
+                        color: Colors.black54,
+                        offset: Offset(0, 2),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -264,6 +287,16 @@ class WallpaperPreview extends StatelessWidget {
       );
     } else {
       return previewArea;
+    }
+  }
+
+  String _getFormattedDate(String format, bool allCaps) {
+    try {
+      final dateStr = DateFormat(format).format(DateTime.now());
+      return allCaps ? dateStr.toUpperCase() : dateStr;
+    } catch (_) {
+      final fallback = DateFormat('EEE, MMM dd').format(DateTime.now());
+      return allCaps ? fallback.toUpperCase() : fallback;
     }
   }
 }

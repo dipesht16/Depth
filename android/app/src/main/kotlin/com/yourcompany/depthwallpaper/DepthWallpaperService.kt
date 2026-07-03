@@ -48,6 +48,17 @@ class DepthWallpaperService : WallpaperService() {
             }
         }
 
+        private val midnightRunnable = object : Runnable {
+            override fun run() {
+                Log.d(TAG, "Midnight update: refreshing date")
+                drawWallpaper()
+                if (isVisible && config.showDate) {
+                    // Schedule next midnight 24 hours from now
+                    handler.postDelayed(this, 24 * 60 * 60 * 1000L)
+                }
+            }
+        }
+
         override fun onCreate(surfaceHolder: SurfaceHolder?) {
             super.onCreate(surfaceHolder)
             val prefs = getSharedPreferences("wallpaper_config", Context.MODE_PRIVATE)
@@ -61,6 +72,7 @@ class DepthWallpaperService : WallpaperService() {
             prefs.unregisterOnSharedPreferenceChangeListener(this)
             // Critical: remove all pending callbacks to prevent memory leaks
             handler.removeCallbacks(updateRunnable)
+            handler.removeCallbacks(midnightRunnable)
             recycleBitmaps()
         }
 
@@ -72,10 +84,13 @@ class DepthWallpaperService : WallpaperService() {
                 drawWallpaper()
                 // Remove any stale pending callbacks before scheduling fresh one
                 handler.removeCallbacks(updateRunnable)
+                handler.removeCallbacks(midnightRunnable)
                 scheduleNextUpdate()
+                if (config.showDate) scheduleMidnightUpdate()
             } else {
                 // Screen off / wallpaper hidden — stop all updates to conserve battery
                 handler.removeCallbacks(updateRunnable)
+                handler.removeCallbacks(midnightRunnable)
             }
         }
 
@@ -184,6 +199,10 @@ class DepthWallpaperService : WallpaperService() {
                 drawBackground(canvas)
                 drawClock(canvas)
                 drawForeground(canvas)
+                // Layer 4: Date (on top of everything — HUD element)
+                if (::config.isInitialized && config.showDate) {
+                    drawDate(canvas)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error drawing wallpaper", e)
             } finally {
@@ -300,6 +319,63 @@ class DepthWallpaperService : WallpaperService() {
             } else {
                 60000L // Update every minute for all other formats
             }
+        }
+
+        /**
+         * Draws the date text on top of all layers (HUD element).
+         */
+        private fun drawDate(canvas: Canvas) {
+            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = config.dateColor
+                textSize = config.dateFontSize * canvasWidth
+                textAlign = Paint.Align.LEFT
+                typeface = if (config.dateBold) {
+                    Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                } else {
+                    Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                }
+                setShadowLayer(4f, 0f, 2f, Color.argb(128, 0, 0, 0))
+            }
+
+            var dateText = getFormattedDate()
+            if (config.dateAllCaps) dateText = dateText.uppercase()
+
+            val x = config.dateHorizontalPos * canvasWidth
+            val y = config.dateVerticalPos * canvasHeight
+            canvas.drawText(dateText, x, y, datePaint)
+        }
+
+        private fun getFormattedDate(): String {
+            return try {
+                val pattern = when (config.dateFormat) {
+                    "MMM dd, yyyy" -> "MMM dd, yyyy"
+                    "dd/MM/yyyy"   -> "dd/MM/yyyy"
+                    "MM-dd-yyyy"   -> "MM-dd-yyyy"
+                    "EEEE, MMMM dd" -> "EEEE, MMMM dd"
+                    else           -> "EEE, MMM dd"
+                }
+                SimpleDateFormat(pattern, Locale.getDefault()).format(Date())
+            } catch (e: Exception) {
+                SimpleDateFormat("EEE, MMM dd", Locale.getDefault()).format(Date())
+            }
+        }
+
+        /**
+         * Schedules a redraw at the next midnight (00:00:00) to refresh the date.
+         */
+        private fun scheduleMidnightUpdate() {
+            if (!isVisible || !::config.isInitialized || !config.showDate) return
+            val now = Calendar.getInstance()
+            val tomorrow = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val delayToMidnight = tomorrow.timeInMillis - now.timeInMillis
+            Log.d(TAG, "Next midnight update in ${delayToMidnight / 1000}s")
+            handler.postDelayed(midnightRunnable, delayToMidnight)
         }
     }
 }
