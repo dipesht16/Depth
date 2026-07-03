@@ -46,3 +46,6 @@ app.*.map.json
 
 # Project documentation
 /docs/
+
+# VS Code configurations
+.vscode/
