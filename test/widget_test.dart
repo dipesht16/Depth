@@ -7,6 +7,7 @@ import 'package:wallpaper/models/app_settings.dart';
 import 'package:wallpaper/models/wallpaper_config.dart';
 import 'package:wallpaper/models/wallpaper_project.dart';
 import 'package:wallpaper/services/project_repository.dart';
+import 'package:wallpaper/screens/mask_editor_screen.dart';
 import 'package:wallpaper/widgets/project_card.dart';
 import 'package:wallpaper/screens/home_screen.dart';
 import 'package:wallpaper/screens/onboarding_screen.dart';
@@ -283,6 +284,20 @@ void main() {
       expect(find.text('Autumn Vibe'), findsOneWidget);
       expect(find.text('ACTIVE'), findsOneWidget);
       expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
+    });
+
+    test('Mask Editor DrawingStroke model and configurations', () {
+      final stroke = DrawingStroke(
+        points: [const Offset(10.0, 15.0), const Offset(20.0, 25.0)],
+        brushSize: 12.0,
+        isErase: true,
+      );
+
+      expect(stroke.points.length, 2);
+      expect(stroke.points.first.dx, 10.0);
+      expect(stroke.points.first.dy, 15.0);
+      expect(stroke.brushSize, 12.0);
+      expect(stroke.isErase, isTrue);
     });
   });
 }

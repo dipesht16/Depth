@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/wallpaper_data.dart';
@@ -201,30 +200,7 @@ class WallpaperPreview extends StatelessWidget {
             // Layer 2: Positioned Clock (only rendered when background is loaded)
             if (data.originalImagePath != null) clockWidget,
 
-            // Layer 3a: Foreground subject drop shadow (for 3D depth separation / uplift effect)
-            if (data.originalImagePath != null && data.foregroundImagePath != null)
-              Positioned.fill(
-                child: Transform.translate(
-                  // Shift shadow down and right for realistic depth lighting
-                  offset: Offset(width * 0.015, width * 0.025),
-                  child: ImageFiltered(
-                    // Soften the shadow using a responsive Gaussian blur
-                    imageFilter: ui.ImageFilter.blur(
-                      sigmaX: width * 0.02,
-                      sigmaY: width * 0.02,
-                    ),
-                    child: Image.file(
-                      File(data.foregroundImagePath!),
-                      fit: BoxFit.cover,
-                      color: Colors.black.withValues(alpha: 0.55),
-                      colorBlendMode: BlendMode.srcIn,
-                      cacheWidth: targetCacheWidth > 0 ? targetCacheWidth : null,
-                    ),
-                  ),
-                ),
-              ),
-
-            // Layer 3b: Foreground transparent cutout subject (actual subject)
+            // Layer 3: Foreground transparent cutout subject (actual subject)
             if (data.originalImagePath != null && data.foregroundImagePath != null)
               Positioned.fill(
                 child: Image.file(

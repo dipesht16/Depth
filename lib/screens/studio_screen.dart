@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,6 +22,7 @@ import '../widgets/wallpaper_preview.dart';
 import '../widgets/date_tab.dart';
 import '../widgets/date_settings_tab.dart';
 import 'preview_screen.dart';
+import 'mask_editor_screen.dart';
 
 class StudioScreen extends StatefulWidget {
   /// Pass an existing project to enter edit mode; null for new project.
@@ -338,6 +341,85 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
     }
   }
 
+  /// Opens the manual painting mask editor to refine the cutout.
+  Future<void> _openMaskEditor() async {
+    final originalPath = _wallpaperData.originalImagePath;
+    if (originalPath == null) return;
+
+    final File originalFile = File(originalPath);
+    if (!originalFile.existsSync()) return;
+
+    // Open mask editor
+    final Uint8List? editedCutoutBytes = await Navigator.of(context).push<Uint8List?>(
+      MaterialPageRoute(
+        builder: (context) => MaskEditorScreen(
+          originalImagePath: originalPath,
+          initialMaskPath: _wallpaperData.foregroundImagePath,
+        ),
+      ),
+    );
+
+    if (editedCutoutBytes == null || editedCutoutBytes.isEmpty) {
+      // User cancelled editing - no action
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadingText = 'Saving refined cutout...';
+    });
+
+    try {
+      // Generate unique path (rotation) to bypass Flutter image caching
+      final appDir = await FileManager.getAppDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final newForegroundPath = p.join(
+        appDir.path,
+        'foreground_${timestamp}_refined.png',
+      );
+
+      // Write refined PNG bytes to disk
+      await File(newForegroundPath).writeAsBytes(editedCutoutBytes);
+
+      // Clean up the previous foreground image file
+      if (_wallpaperData.foregroundImagePath != null) {
+        final prevFile = File(_wallpaperData.foregroundImagePath!);
+        if (prevFile.existsSync()) {
+          prevFile.deleteSync();
+        }
+      }
+
+      setState(() {
+        _wallpaperData = _wallpaperData.copyWith(
+          foregroundImagePath: newForegroundPath,
+        );
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cutout updated successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save cutout: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _applyWallpaper() async {
     if (_wallpaperData.originalImagePath == null) return;
 
@@ -492,6 +574,12 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
             tooltip: 'Reset Settings',
             onPressed: _isLoading ? null : _resetSettings,
           ),
+          if (originalImagePath != null)
+            IconButton(
+              icon: const Icon(Icons.brush_rounded),
+              tooltip: 'Refine Depth Object',
+              onPressed: _isLoading ? null : _openMaskEditor,
+            ),
           // Save project button
           IconButton(
             icon: _isSaving
