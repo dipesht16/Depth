@@ -173,14 +173,31 @@ class DepthWallpaperService : WallpaperService() {
         }
 
         private fun getTypefaceForFont(fontFamily: String): Typeface {
-            return when (fontFamily) {
-                "Default" -> Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-                "Roboto" -> Typeface.create("sans-serif", Typeface.BOLD)
-                "Outfit" -> Typeface.create("sans-serif", Typeface.BOLD)
-                "Inter" -> Typeface.create("sans-serif-condensed", Typeface.BOLD)
-                "Lilita One" -> Typeface.create("sans-serif-black", Typeface.BOLD)
-                "Rubik" -> Typeface.create("sans-serif-medium", Typeface.BOLD)
-                else -> Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            return try {
+                when (fontFamily) {
+                    "Default" -> Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                    "Roboto" -> Typeface.create("sans-serif", Typeface.BOLD)
+                    "Outfit" -> Typeface.create("sans-serif", Typeface.BOLD)
+                    "Inter" -> Typeface.create("sans-serif-condensed", Typeface.BOLD)
+                    "Lilita One" -> Typeface.create("sans-serif-black", Typeface.BOLD)
+                    "Rubik" -> Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    
+                    // Custom Local Fonts from Flutter Assets
+                    "New York Heavy" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/NewYork-Heavy.otf")
+                    "New York Semibold" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/NewYork-Semibold.otf")
+                    "SF Pro Rails" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/SFPro-Semibold-Rails.otf")
+                    "SF Pro Rounded" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/SFPro-Semibold-Rounded.otf")
+                    "SF Pro Soft" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/SFPro-Semibold-Soft.otf")
+                    "SF Pro Stencil" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/SFPro-Semibold-Stencil.otf")
+                    "SF Pro Semibold" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/SFPro-Semibold.otf")
+                    "SF Pro Display" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/SFProDisplay-Bold.otf")
+                    "SF Pro Mono" -> Typeface.createFromAsset(applicationContext.assets, "flutter_assets/assets/fonts/SFMono-Bold.otf")
+                    
+                    else -> Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading custom font $fontFamily from assets", e)
+                Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
         }
 

@@ -837,6 +837,15 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
       'Inter',
       'Lilita One',
       'Rubik',
+      'New York Heavy',
+      'New York Semibold',
+      'SF Pro Semibold',
+      'SF Pro Display',
+      'SF Pro Rounded',
+      'SF Pro Soft',
+      'SF Pro Stencil',
+      'SF Pro Rails',
+      'SF Pro Mono',
     ];
 
     final List<Map<String, dynamic>> colorSwatches = [
@@ -852,8 +861,20 @@ class _StudioScreenState extends State<StudioScreen> with SingleTickerProviderSt
 
     TextStyle textStyleForFont(String fontName) {
       final base = const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600);
-      if (fontName == 'Roboto') {
-        return base.copyWith(fontFamily: 'Roboto');
+      final localFonts = {
+        'New York Heavy',
+        'New York Semibold',
+        'SF Pro Semibold',
+        'SF Pro Display',
+        'SF Pro Rounded',
+        'SF Pro Soft',
+        'SF Pro Stencil',
+        'SF Pro Rails',
+        'SF Pro Mono',
+      };
+
+      if (fontName == 'Roboto' || localFonts.contains(fontName)) {
+        return base.copyWith(fontFamily: fontName);
       } else {
         try {
           return GoogleFonts.getFont(fontName, textStyle: base);

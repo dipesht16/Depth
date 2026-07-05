@@ -52,8 +52,20 @@ class WallpaperPreview extends StatelessWidget {
 
         // Apply Google Fonts dynamically if not system default Roboto
         TextStyle clockStyle;
-        if (config.fontFamily == 'Roboto') {
-          clockStyle = baseClockStyle.copyWith(fontFamily: 'Roboto');
+        final localFonts = {
+          'New York Heavy',
+          'New York Semibold',
+          'SF Pro Semibold',
+          'SF Pro Display',
+          'SF Pro Rounded',
+          'SF Pro Soft',
+          'SF Pro Stencil',
+          'SF Pro Rails',
+          'SF Pro Mono',
+        };
+
+        if (config.fontFamily == 'Roboto' || localFonts.contains(config.fontFamily)) {
+          clockStyle = baseClockStyle.copyWith(fontFamily: config.fontFamily);
         } else {
           try {
             clockStyle = GoogleFonts.getFont(
